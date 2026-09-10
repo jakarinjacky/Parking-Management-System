@@ -1,0 +1,157 @@
+# 🅿️ Smart Parking Management System (OOP-Driven Full Stack Web Application)
+
+ระบบบริหารจัดการลานจอดรถอัจฉริยะ (Smart Parking Management System) ที่ออกแบบและพัฒนาตามหลักการ **Object-Oriented Programming (OOP)**, **SOLID Principles**, และ **Design Patterns** อย่างเข้มข้น ครอบคลุมทั้งฝั่ง Domain Logic, Service Layer, Embedded REST API Server และ Modern Interactive Web Interface
+
+---
+
+## 🌟 จุดเด่นและสถาปัตยกรรม OOP (Key Highlights)
+
+### 1. เสาหลัก OOP ทั้ง 4 ประการ (The 4 OOP Pillars)
+- **Abstraction (นามธรรม)**: 
+  - `Vehicle`: คลาสแม่นามธรรม ซ่อนรายละเอียดและบังคับสัญญาผ่านเมธอด `canParkIn(Slot slot)` และ `getPricingStrategy()`
+  - `Payment`: คลาสแม่นามธรรมสำหรับการชำระเงิน พร้อมเมธอด `processPayment()`
+  - `PricingStrategy` & `SlotAllocationStrategy`: อินเตอร์เฟสกฎการคิดราคาและการจัดสรรช่องจอด
+- **Encapsulation (การห่อหุ้มและการซ่อนข้อมูล)**:
+  - `Slot`: ปกป้อง Invariants และความถูกต้องของสถานะช่องจอด เช่น ห้ามรับรถใหม่เมื่อสถานะเป็น `OCCUPIED` และจัดการจอง/ปลดปล่อยผ่าน `assignVehicle()` และ `release()` แบบ Thread-Safe
+  - `Ticket`: ควบคุม State Transition (ACTIVE -> PAID -> EXITED หรือ LOST) โดยไม่ให้แก้ไขค่าธรรมเนียมหรือสถานะจากภายนอกโดยตรง
+- **Inheritance (การสืบทอดคุณสมบัติ)**:
+  - `Vehicle` ➔ `Car`, `Motorcycle`, `ElectricVehicle`, `Truck`
+  - `Payment` ➔ `PromptPayPayment`, `CreditCardPayment`, `CashPayment`
+- **Polymorphism & Double Dispatch**:
+  - เมธอด `slot.canFitVehicle(vehicle)` ส่งต่อความรับผิดชอบให้ `vehicle.canParkIn(this)` เพื่อให้รถแต่ละชนิดตัดสินตามขีดความสามารถของตนเอง
+  - การคำนวณค่าจอดเรียกผ่าน `PricingStrategy.calculateFee()` โดยผลลัพธ์จะแปรผันตามประเภทรถและระยะเวลาจริง
+
+---
+
+### 2. Design Patterns ที่นำมาประยุกต์ใช้
+1. **Strategy Pattern**: 
+   - แยกตรรกะการคิดเงินออกจากคลาสหลัก รองรับการปรับเปลี่ยนราคาหรือเพิ่มโปรโมชันตาม Open-Closed Principle
+   - `StandardPricingStrategy`: ฟรี 15 นาทีแรก, ชม. แรก 20 บาท, ชม. ถัดไป 30 บาท/ชม.
+   - `MotorcyclePricingStrategy`: ฟรี 30 นาทีแรก, 10 บาท/ชม.
+   - `EVPricingStrategy`: 40 บาท/ชม. (รวมค่าใช้บริการจุดชาร์จ EV)
+   - `TruckPricingStrategy`: 50 บาท/ชม. สำหรับรถขนาดใหญ่
+2. **Observer Pattern**:
+   - `ParkingLot` ทำหน้าที่เป็น Subject (Notifier)
+   - `DisplayBoard` (ป้ายไฟทางเข้า) ทำหน้าที่เป็น Observer คอยรับอัปเดตจำนวนที่ว่างและข้อความเตือนเมื่อมีรถเข้าหรือออกจากช่องจอดแบบเรียลไทม์
+3. **Factory Pattern**:
+   - `VehicleFactory`: สร้างออบเจกต์รถตามประเภทและเงื่อนไข
+   - `SlotFactory`: สร้างช่องจอดรถตามรหัสและประเภท
+4. **Aggregate Root / Facade**:
+   - `ParkingLot` เป็น Aggregate Root ควบคุม Floor และ Slot
+   - `ParkingService` เป็น Facade เชื่อมโยง Domain Entities, Repositories, Observer และ Clock Simulation
+
+---
+
+## 📁 โครงสร้างโปรเจกต์ (Project Structure)
+
+```text
+IDe/
+├── src/
+│   ├── domain/
+│   │   ├── enums/
+│   │   │   ├── VehicleType.java       # CAR, MOTORCYCLE, ELECTRIC_VEHICLE, TRUCK
+│   │   │   ├── SlotType.java          # STANDARD, COMPACT, MOTORCYCLE, LARGE, EV_CHARGING
+│   │   │   ├── SlotStatus.java        # AVAILABLE, OCCUPIED, RESERVED, MAINTENANCE
+│   │   │   ├── TicketStatus.java      # ACTIVE, PAID, EXITED, LOST
+│   │   │   ├── PaymentStatus.java     # PENDING, SUCCESS, FAILED
+│   │   │   └── PaymentMethod.java     # PROMPTPAY, CREDIT_CARD, CASH
+│   │   ├── model/
+│   │   │   ├── Vehicle.java           # Abstract Base Class
+│   │   │   ├── Car.java
+│   │   │   ├── Motorcycle.java
+│   │   │   ├── ElectricVehicle.java
+│   │   │   ├── Truck.java
+│   │   │   ├── Slot.java              # Slot Entity with Encapsulation
+│   │   │   ├── ParkingFloor.java      # Floor Entity managing slots
+│   │   │   ├── ParkingLot.java        # Aggregate Root with Observer support
+│   │   │   └── Ticket.java            # Parking Ticket Entity
+│   │   ├── strategy/
+│   │   │   ├── PricingStrategy.java
+│   │   │   ├── StandardPricingStrategy.java
+│   │   │   ├── MotorcyclePricingStrategy.java
+│   │   │   ├── EVPricingStrategy.java
+│   │   │   ├── TruckPricingStrategy.java
+│   │   │   ├── SlotAllocationStrategy.java
+│   │   │   └── NearestFirstAllocationStrategy.java
+│   │   ├── observer/
+│   │   │   ├── ParkingLotObserver.java
+│   │   │   └── DisplayBoard.java
+│   │   ├── factory/
+│   │   │   ├── VehicleFactory.java
+│   │   │   └── SlotFactory.java
+│   │   └── payment/
+│   │       ├── Payment.java           # Abstract Base Class
+│   │       ├── PromptPayPayment.java
+│   │       ├── CreditCardPayment.java
+│   │       └── CashPayment.java
+│   ├── repository/
+│   │   ├── TicketRepository.java
+│   │   └── PaymentRepository.java
+│   ├── service/
+│   │   └── ParkingService.java        # Facade / Application Service
+│   ├── server/
+│   │   └── ParkingServer.java         # Pure Java SE HTTP REST API & Static Server
+│   ├── test/
+│   │   └── ParkingSystemTest.java     # Automated Unit Test Suite
+│   └── util/
+│       └── SimpleJson.java            # Pure Java JSON Utility
+├── web/
+│   ├── index.html                     # Modern Glassmorphic SPA
+│   ├── css/style.css                  # Responsive Theme & Animations
+│   └── js/app.js                      # REST Client & Interactive UI Controller
+├── run.bat                            # สคริปต์คอมไพล์ ทดสอบ และเปิดเว็บ (1-Click)
+├── test.bat                           # สคริปต์รันเฉพาะ Unit Tests
+└── README.md
+```
+
+---
+
+## 🚀 วิธีการติดตั้งและรันระบบ (How to Run)
+
+> [!NOTE]
+> ระบบนี้พัฒนาด้วย **Pure Java SE 26** ไม่จำเป็นต้องติดตั้ง Maven, Gradle, Node.js หรือซอฟต์แวร์เสริมใดๆ เพิ่มเติม
+
+### วิธีที่ 1: ดับเบิลคลิกไฟล์ Batch (ง่ายที่สุด)
+- ดับเบิลคลิกที่ไฟล์ **`run.bat`**
+- สคริปต์จะทำการ:
+  1. คอมไพล์ซอร์สโค้ด Java ทั้งหมดไปยังโฟลเดอร์ `bin/`
+  2. รัน Automated Unit Tests (ยืนยันผลทดสอบ 100%)
+  3. สตาร์ต Server บนพอร์ต 8080
+  4. เปิดเว็บเบราว์เซอร์ไปยัง `http://localhost:8080` อัตโนมัติ
+
+### วิธีที่ 2: รันผ่าน Terminal / PowerShell
+```powershell
+# 1. คอมไพล์โค้ด
+if (!(Test-Path bin)) { New-Item -ItemType Directory -Path bin }
+javac -encoding UTF-8 -d bin (Get-ChildItem -Path src -Recurse -Filter *.java | ForEach-Object { $_.FullName })
+
+# 2. รัน Unit Tests เพื่อตรวจสอบ Business Logic
+java -cp bin test.ParkingSystemTest
+
+# 3. รัน Server
+java -cp bin server.ParkingServer
+```
+จากนั้นเปิดเบราว์เซอร์ไปที่: **`http://localhost:8080`**
+
+---
+
+## 💻 ฟังก์ชันและการใช้งานระบบบนหน้าเว็บ (Web Features)
+
+1. **แผนผังช่องจอดรถ (2D Lot Map)**:
+   - แสดงช่องจอดแยกตามชั้น (ชั้น 1: VIP & EV & เก๋ง, ชั้น 2: เก๋ง & รถเล็ก, ชั้น 3: มอเตอร์ไซค์ & รถใหญ่)
+   - สีของช่องจอดแสดงสถานะแบบเรียลไทม์ (เขียว = ว่าง, แดง = มีรถจอด, ฟ้า = หัวชาร์จ EV)
+   - คลิกที่ช่องจอดเพื่อดูข้อมูลรถ, เวลาเข้า, กลยุทธ์ราคา และค่าบริการสะสม ณ เวลานั้น
+2. **จุดตรวจทางเข้า (Entry Gate)**:
+   - ป้อนเลขทะเบียน (มีปุ่มสุ่มป้ายทะเบียน)
+   - เลือกประเภทยานพาหนะ (รถยนต์, EV, มอเตอร์ไซค์, รถบรรทุก)
+   - มีแอนิเมชันไม้กั้นเปิด-ปิด และออกตั๋วพร้อมบาร์โค้ด
+3. **ระบบเร่งเวลาจำลอง (Time Travel / Clock Simulation)**:
+   - ปุ่ม `+15m`, `+1h`, `+3h`, `+1d` เพื่อทดสอบกฎการคำนวณค่าจอดตามช่วงเวลาได้ทันที
+4. **จุดชำระเงินและทางออก (Exit & Cashier)**:
+   - ค้นหาตั๋วด้วยเลขตั๋วหรือป้ายทะเบียน (มี Quick Pick รถที่จอดอยู่ให้คลิกเลือกได้ทันที)
+   - แสดงคำนวณค่าจอดแยกตาม Pricing Strategy
+   - รองรับ 3 ช่องทางชำระ: **PromptPay QR**, **Credit Card**, **เงินสด** (คำนวณเงินทอนอัตโนมัติ)
+   - ออกใบเสร็จรับเงินอย่างเป็นทางการ (Official Receipt Modal)
+   - รองรับปุ่ม **"ตั๋วหาย"** คิดค่าปรับ 300 บาทตามข้อกำหนด
+5. **แท็บ OOP Architecture & SOLID Explorer**:
+   - หน้าอธิบายหลักการ OOP และ Design Patterns ที่ใช้ในระบบเพื่อการเรียนรู้และการนำเสนอ

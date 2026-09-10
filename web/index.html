@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Parking Management System | OOP Full Stack System</title>
+    <meta name="description" content="ระบบบริหารจัดการลานจอดรถอัจฉริยะ พัฒนาด้วยหลักการ Object-Oriented Programming (OOP) และ Design Patterns อย่างเข้มข้น">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="dark-theme">
+    <!-- Main App Container -->
+    <div class="app-layout">
+        <!-- Top Navbar -->
+        <header class="top-nav">
+            <div class="brand-group">
+                <div class="brand-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="4" />
+                        <path d="M9 17V7h4a3 3 0 0 1 0 6H9" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="brand-title">Smart Parking System</h1>
+                    <p class="brand-subtitle">OOP Architecture • SOLID Principles • Design Patterns</p>
+                </div>
+            </div>
+
+            <!-- Simulation Clock Controls -->
+            <div class="clock-controller" id="clockController">
+                <div class="clock-display">
+                    <span class="clock-badge">SIMULATION TIME</span>
+                    <span class="clock-time" id="simulatedTimeText">--:--:--</span>
+                </div>
+                <div class="time-actions">
+                    <button class="time-btn" onclick="fastForward(15)" title="เพิ่ม 15 นาที">+15m</button>
+                    <button class="time-btn" onclick="fastForward(60)" title="เพิ่ม 1 ชั่วโมง">+1h</button>
+                    <button class="time-btn" onclick="fastForward(180)" title="เพิ่ม 3 ชั่วโมง">+3h</button>
+                    <button class="time-btn" onclick="fastForward(1440)" title="เพิ่ม 1 วัน">+1d</button>
+                    <button class="time-btn btn-reset" onclick="resetSimTime()" title="รีเซ็ตเวลา">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Header Quick Stats -->
+            <div class="nav-metrics">
+                <div class="metric-pill available">
+                    <span class="dot green"></span>
+                    <span class="label">ว่าง</span>
+                    <strong id="headerAvailCount">0</strong>
+                </div>
+                <div class="metric-pill occupied">
+                    <span class="dot red"></span>
+                    <span class="label">จอดอยู่</span>
+                    <strong id="headerOccCount">0</strong>
+                </div>
+                <div class="metric-pill revenue">
+                    <span class="label">รายได้สะสม</span>
+                    <strong id="headerRevenueText">฿0.00</strong>
+                </div>
+            </div>
+        </header>
+
+        <!-- Live Gate Display Board Banner (Observer Pattern) -->
+        <div class="display-board-banner">
+            <div class="board-badge">
+                <span class="pulse-dot"></span>
+                <span>ป้ายไฟทางเข้าหลัก (DISPLAY BOARD)</span>
+            </div>
+            <div class="board-marquee" id="displayBoardMessage">กำลังเชื่อมต่อระบบสังเกตการณ์ (Observer Pattern)...</div>
+            <div class="board-time" id="displayBoardTime">--:--:--</div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="main-tabs">
+            <button class="tab-btn active" onclick="switchTab('lot-view')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                <span>แผนผังช่องจอด (2D Lot Map)</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('entry-gate')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                <span>จุดตรวจทางเข้า (Entry Gate)</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('exit-cashier')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                <span>จุดชำระเงิน & ทางออก (Exit & Pay)</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('tickets-history')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <span>ประวัติตั๋ว & บัญชี (Ledger)</span>
+            </button>
+            <button class="tab-btn highlight-tab" onclick="switchTab('oop-docs')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                <span>สถาปัตยกรรม OOP & SOLID</span>
+            </button>
+            <button class="tab-btn ai-tab" onclick="switchTab('ai-ops')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3v1a4 4 0 0 1-4 4 4 4 0 0 1-4-4v-1a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="11" r="1"/><circle cx="15" cy="11" r="1"/><path d="M10 16h4"/></svg>
+                <span>🤖 ศูนย์ปฏิบัติการ AI & XAI</span>
+            </button>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="content-container">
+
+            <!-- TAB 1: 2D Interactive Parking Lot Map -->
+            <section id="tab-lot-view" class="tab-content active">
+                <div class="lot-controls-bar">
+                    <!-- Floor Switcher -->
+                    <div class="floor-pills" id="floorPillGroup">
+                        <!-- Rendered by JS -->
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="slot-legend">
+                        <div class="legend-item"><span class="legend-color available"></span> ว่าง</div>
+                        <div class="legend-item"><span class="legend-color occupied"></span> มีรถจอด</div>
+                        <div class="legend-item"><span class="legend-color ev"></span> EV Charging</div>
+                        <div class="legend-item"><span class="legend-color moto"></span> มอเตอร์ไซค์</div>
+                        <div class="legend-item"><span class="legend-color large"></span> รถขนาดใหญ่</div>
+                        <div class="legend-item ai-heat-legend" id="aiHeatLegend" style="display: none;"><span class="legend-color ai-heat"></span> 🔥 จุดหนาแน่น AI</div>
+                    </div>
+
+                    <div class="lot-actions-right">
+                        <button class="btn-ai-pill" id="btnToggleAiHeatmap" onclick="toggleAiHeatmap()">
+                            <span class="ai-sparkle">✨</span>
+                            <span id="aiHeatmapBtnText">เปิด AI Heatmap</span>
+                        </button>
+                        <button class="btn-secondary" onclick="loadParkingLotData()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                            รีเฟรชผัง
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Grid of Slots -->
+                <div class="lot-grid-wrapper">
+                    <div class="floor-header-info">
+                        <h2 id="currentFloorTitle">ชั้นที่ 1</h2>
+                        <div class="floor-stats-badge" id="currentFloorStats">กำลังโหลด...</div>
+                    </div>
+
+                    <div class="slots-grid" id="slotsGrid">
+                        <!-- Slots dynamically rendered here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: Entry Gate (Check-In Terminal) -->
+            <section id="tab-entry-gate" class="tab-content">
+                <div class="entry-layout">
+                    <!-- Check-in Form Card -->
+                    <div class="card glass-card">
+                        <div class="card-header">
+                            <div class="card-title-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                            </div>
+                            <div>
+                                <h2>ออกบัตรเข้าจอดรถ (Vehicle Check-In)</h2>
+                                <p class="text-muted">ระบบตรวจสอบเงื่อนไข canParkIn() และจัดสรรช่องจอดอัตโนมัติ</p>
+                            </div>
+                        </div>
+
+                        <!-- AI Computer Vision ANPR Scanner Card -->
+                        <div class="ai-anpr-card" id="aiAnprCard">
+                            <div class="anpr-header">
+                                <div class="anpr-badge">
+                                    <span class="pulse-dot-ai"></span>
+                                    <span>AI SMART CAMERA (ANPR / LPR)</span>
+                                </div>
+                                <span class="anpr-fps">4K UHD • 60 FPS</span>
+                            </div>
+                            <div class="anpr-scanner-viewport" id="anprViewport">
+                                <div class="scanner-grid"></div>
+                                <div class="scanner-laser" id="scannerLaser"></div>
+                                <div class="viewfinder-corner top-left"></div>
+                                <div class="viewfinder-corner top-right"></div>
+                                <div class="viewfinder-corner bottom-left"></div>
+                                <div class="viewfinder-corner bottom-right"></div>
+                                <div class="scanner-plate-target" id="anprPlateTarget">
+                                    <span class="target-icon">🎯</span>
+                                    <span id="anprTargetText">พร้อมสแกนป้ายทะเบียนหน้ารถ</span>
+                                </div>
+                            </div>
+                            <div class="anpr-actions">
+                                <button type="button" class="btn-ai-scan" id="btnTriggerAnpr" onclick="triggerAiAnprScan()">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                    <span>สแกนป้ายทะเบียน & จำแนกรถด้วย AI</span>
+                                </button>
+                                <button type="button" class="btn-ghost" onclick="randomizePlate()">สุ่มป้าย</button>
+                            </div>
+                            <!-- AI Detection Feedback -->
+                            <div class="anpr-result-box" id="anprResultBox" style="display: none;">
+                                <div class="anpr-result-meta">
+                                    <span class="ai-tag">AI Vision Confirmed</span>
+                                    <span class="confidence-badge" id="anprConfidenceText">Confidence: 99.2%</span>
+                                </div>
+                                <div class="anpr-explanation-text" id="anprExplanationText">
+                                    โมเดลตรวจจับป้ายทะเบียนและจำแนกประเภทยานพาหนะสำเร็จ
+                                </div>
+                            </div>
+                        </div>
+
+                        <form id="checkInForm" onsubmit="handleCheckIn(event)">
+                            <div class="form-group">
+                                <label for="licensePlate">เลขทะเบียนรถ <span class="required">*</span></label>
+                                <div class="input-with-action">
+                                    <input type="text" id="licensePlate" class="form-input" placeholder="เช่น 3กข-9876 กรุงเทพฯ" required maxlength="15" oninput="debounceAiRecommend()">
+                                    <button type="button" class="btn-ghost" onclick="randomizePlate()">สุ่มทะเบียน</button>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>ประเภทยานพาหนะ (Vehicle Type) <span class="required">*</span></label>
+                                <div class="vehicle-type-selector">
+                                    <label class="type-card active">
+                                        <input type="radio" name="vType" value="CAR" checked onchange="updateVehicleSelection()">
+                                        <span class="type-icon">🚗</span>
+                                        <span class="type-name">รถยนต์ทั่วไป</span>
+                                        <span class="type-sub">เก๋ง / SUV / Crossover</span>
+                                    </label>
+                                    <label class="type-card">
+                                        <input type="radio" name="vType" value="ELECTRIC_VEHICLE" onchange="updateVehicleSelection()">
+                                        <span class="type-icon">⚡</span>
+                                        <span class="type-name">รถยนต์ไฟฟ้า (EV)</span>
+                                        <span class="type-sub">ต้องการชาร์จไฟ</span>
+                                    </label>
+                                    <label class="type-card">
+                                        <input type="radio" name="vType" value="MOTORCYCLE" onchange="updateVehicleSelection()">
+                                        <span class="type-icon">🏍️</span>
+                                        <span class="type-name">มอเตอร์ไซค์</span>
+                                        <span class="type-sub">บิ๊กไบค์ / สกู๊ตเตอร์</span>
+                                    </label>
+                                    <label class="type-card">
+                                        <input type="radio" name="vType" value="TRUCK" onchange="updateVehicleSelection()">
+                                        <span class="type-icon">🚚</span>
+                                        <span class="type-name">รถบรรทุก / รถตู้ใหญ่</span>
+                                        <span class="type-sub">ช่องจอดขนาดพิเศษ</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="form-group" id="evOptionGroup" style="display: none;">
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="requiresCharging" checked onchange="requestAiRecommendation()">
+                                    <span class="checkmark"></span>
+                                    <span>ต้องการเข้าจอดช่องที่มีแท่นชาร์จ EV (EV Charging Station)</span>
+                                </label>
+                            </div>
+
+                            <!-- Explainable AI (XAI) Smart Slot Recommendation Card -->
+                            <div class="ai-rec-box" id="aiRecBox">
+                                <div class="ai-rec-header">
+                                    <div class="ai-rec-title-group">
+                                        <span class="ai-chip">✨ AI OPTIMAL RECOMMENDATION</span>
+                                        <span class="match-badge" id="aiMatchScoreBadge">98.5% Match</span>
+                                    </div>
+                                    <div class="rec-slot-badge" id="aiRecSlotBadge">ช่องแนะนำ: F1-01</div>
+                                </div>
+                                <div class="ai-rec-reason" id="aiRecReasonText">
+                                    กำลังวิเคราะห์ช่องจอดที่เหมาะสมที่สุดด้วย AI Multi-Criteria Optimization...
+                                </div>
+                                <div class="ai-rec-factors" id="aiRecFactorsList">
+                                    <!-- Rendered dynamically -->
+                                </div>
+                                <div class="ai-rec-impact-row">
+                                    <div class="impact-item">
+                                        <span class="impact-icon">⚡</span>
+                                        <span id="aiEnergyText">ประหยัดพลังงาน: ลดการวนรถในอาคาร</span>
+                                    </div>
+                                    <div class="impact-item">
+                                        <span class="impact-icon">🚦</span>
+                                        <span id="aiCongestionText">การจราจร: ลดจุดตัดคอขวด 40%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Pricing Strategy preview -->
+                            <div class="rate-preview-box" id="ratePreviewBox">
+                                <div class="rate-preview-header">
+                                    <span class="strategy-badge" id="rateStrategyBadge">StandardPricingStrategy</span>
+                                    <span class="rate-title" id="rateStrategyTitle">อัตราค่าบริการ</span>
+                                </div>
+                                <div class="rate-desc" id="rateStrategyDesc">ฟรี 15 นาทีแรก | ชม. แรก 20 บาท | ชม. ถัดไป 30 บาท/ชม.</div>
+                            </div>
+
+                            <button type="submit" class="btn-primary btn-block btn-lg" id="btnIssueTicket">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                                กดรับบัตรจอดรถ & เปิดไม้กั้น (Issue Ticket)
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Gate Animation Visualizer -->
+                    <div class="card glass-card gate-monitor-card">
+                        <h3>สถานะไม้กั้นทางเข้า (Entry Barrier Gate)</h3>
+                        <div class="gate-visualizer">
+                            <div class="traffic-light">
+                                <div class="light light-red active" id="entryLightRed"></div>
+                                <div class="light light-green" id="entryLightGreen"></div>
+                            </div>
+                            <div class="barrier-post">
+                                <div class="barrier-arm" id="entryBarrierArm"></div>
+                            </div>
+                            <div class="gate-road">
+                                <div class="road-car" id="entryAnimatedCar">🚗</div>
+                            </div>
+                        </div>
+                        <div class="gate-status-text" id="entryGateStatusText">ไม้กั้นปิด: รอรถเข้ารับบัตร</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: Exit Gate & Payment Terminal -->
+            <section id="tab-exit-cashier" class="tab-content">
+                <div class="cashier-layout">
+                    <!-- Search & Fee Preview Card -->
+                    <div class="card glass-card">
+                        <div class="card-header">
+                            <div class="card-title-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            </div>
+                            <div>
+                                <h2>ค้นหาตั๋ว & คำนวณค่าบริการ (Check-Out)</h2>
+                                <p class="text-muted">คำนวณตาม Strategy ประเภทยานพาหนะ และระยะเวลาจอดจริง</p>
+                            </div>
+                        </div>
+
+                        <div class="search-ticket-bar">
+                            <input type="text" id="exitSearchQuery" class="form-input" placeholder="พิมพ์เลขที่ตั๋ว เช่น TKT-... หรือ ป้ายทะเบียน">
+                            <button class="btn-primary" onclick="searchTicketForExit()">ค้นหา / สแกนตั๋ว</button>
+                            <button class="btn-danger-ghost" onclick="handleLostTicket()" title="กรณีทำบัตรหาย คิดค่าปรับ 300฿">ตั๋วหาย</button>
+                        </div>
+
+                        <!-- Active Vehicles Quick Pick -->
+                        <div class="quick-pick-section">
+                            <span class="text-muted">หรือเลือกรถที่กำลังจอดอยู่:</span>
+                            <div class="quick-plate-chips" id="quickActivePlates">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Fee Calculation Result Container -->
+                        <div id="feeResultCard" class="fee-result-panel" style="display: none;">
+                            <div class="fee-meta-grid">
+                                <div class="meta-item">
+                                    <span class="meta-label">เลขที่ตั๋ว</span>
+                                    <strong id="feeTicketId" class="mono text-highlight">TKT-XXXX</strong>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">ป้ายทะเบียน</span>
+                                    <strong id="feePlate">-</strong>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">ประเภทรถ</span>
+                                    <span id="feeTypeDisplay" class="badge-pill">รถยนต์</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">ช่องจอด</span>
+                                    <strong id="feeSlotNumber" class="mono">F1-01</strong>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">เวลาเข้าจอด</span>
+                                    <span id="feeEntryTime" class="mono">2026-09-09 10:00</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">เวลาปัจจุบัน (จำลอง)</span>
+                                    <span id="feeCurrentTime" class="mono">2026-09-09 12:30</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">ระยะเวลาที่จอด</span>
+                                    <strong id="feeDuration" class="text-success">2 ชม. 30 นาที</strong>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">Pricing Strategy</span>
+                                    <span id="feeStrategyName" class="mono-badge">StandardPricingStrategy</span>
+                                </div>
+                            </div>
+
+                            <div class="fee-amount-hero">
+                                <div>
+                                    <div class="fee-hero-label">ยอดที่ต้องชำระทั้งสิ้น</div>
+                                    <div class="fee-hero-desc" id="feeRateDesc">ชม. แรก 20 บาท | ชม. ถัดไป 30 บาท</div>
+                                </div>
+                                <div class="fee-hero-number" id="feeAmountHero">฿0.00</div>
+                            </div>
+
+                            <!-- Payment Method Tabs -->
+                            <div class="payment-methods-selector">
+                                <h4>เลือกช่องทางการชำระเงิน (Polymorphic Payment)</h4>
+                                <div class="method-buttons">
+                                    <button class="pay-method-btn active" id="btnMethodPromptPay" onclick="selectPayMethod('PROMPTPAY')">
+                                        <span>📱 PromptPay QR</span>
+                                    </button>
+                                    <button class="pay-method-btn" id="btnMethodCredit" onclick="selectPayMethod('CREDIT_CARD')">
+                                        <span>💳 บัตรเครดิต</span>
+                                    </button>
+                                    <button class="pay-method-btn" id="btnMethodCash" onclick="selectPayMethod('CASH')">
+                                        <span>💵 เงินสด</span>
+                                    </button>
+                                </div>
+
+                                <!-- PromptPay Detail -->
+                                <div id="payDetailsPromptPay" class="pay-detail-box active">
+                                    <div class="promptpay-wrapper">
+                                        <div class="qr-box">
+                                            <div class="qr-mock" id="promptPayQrVisual">
+                                                <!-- Dynamic QR representation -->
+                                                <svg viewBox="0 0 100 100" class="qr-svg">
+                                                    <rect width="100" height="100" fill="#ffffff"/>
+                                                    <path d="M10 10h30v30h-30z M15 15h20v20h-20z M20 20h10v10h-10z M60 10h30v30h-30z M65 15h20v20h-20z M70 20h10v10h-10z M10 60h30v30h-30z M15 65h20v20h-20z M20 70h10v10h-10z M45 15h10v10h-10z M45 35h10v10h-10z M45 60h10v10h-10z M60 60h10v10h-10z M80 60h10v10h-10z M70 70h10v20h-10z M60 80h10v10h-10z M80 80h10v10h-10z" fill="#000000"/>
+                                                </svg>
+                                            </div>
+                                            <div class="qr-meta">
+                                                <div class="thai-qr-logo">Thai QR Payment</div>
+                                                <div class="qr-merchant">ลานจอดรถ Smart Parking Plaza</div>
+                                                <div class="qr-amount" id="qrAmountDisplay">฿0.00</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Credit Card Detail -->
+                                <div id="payDetailsCredit" class="pay-detail-box">
+                                    <div class="form-row">
+                                        <div class="form-group flex-2">
+                                            <label>หมายเลขบัตร (16 หลัก)</label>
+                                            <input type="text" id="ccNumber" class="form-input mono" placeholder="4111 2222 3333 4444" value="4111-2222-3333-8888">
+                                        </div>
+                                        <div class="form-group flex-1">
+                                            <label>วันหมดอายุ</label>
+                                            <input type="text" id="ccExp" class="form-input mono" placeholder="MM/YY" value="12/28">
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group flex-2">
+                                            <label>ชื่อผู้ถือบัตร</label>
+                                            <input type="text" id="ccHolder" class="form-input" placeholder="NAME SURNAME" value="SOMCHAI DEE">
+                                        </div>
+                                        <div class="form-group flex-1">
+                                            <label>CVV</label>
+                                            <input type="password" id="ccCvv" class="form-input mono" placeholder="123" value="999" maxlength="3">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Cash Detail -->
+                                <div id="payDetailsCash" class="pay-detail-box">
+                                    <div class="form-group">
+                                        <label>จำนวนเงินสดที่รับมา (บาท)</label>
+                                        <div class="input-with-action">
+                                            <input type="number" id="cashTenderedInput" class="form-input mono" placeholder="0.00" step="10" oninput="calculateChangePreview()">
+                                            <button type="button" class="btn-ghost" onclick="tenderExactAmount()">พอดี</button>
+                                            <button type="button" class="btn-ghost" onclick="tenderRound(100)">100฿</button>
+                                            <button type="button" class="btn-ghost" onclick="tenderRound(500)">500฿</button>
+                                        </div>
+                                    </div>
+                                    <div class="cash-change-preview">
+                                        <span>เงินทอนโดยประมาณ:</span>
+                                        <strong id="cashChangeDisplay" class="text-success">฿0.00</strong>
+                                    </div>
+                                </div>
+
+                                <button class="btn-primary btn-block btn-lg" onclick="submitPayment()">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                    ยืนยันชำระเงิน & เปิดไม้กั้นทางออก (Process Payment)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Exit Gate Monitor Card -->
+                    <div class="card glass-card gate-monitor-card">
+                        <h3>สถานะไม้กั้นทางออก (Exit Barrier Gate)</h3>
+                        <div class="gate-visualizer">
+                            <div class="traffic-light">
+                                <div class="light light-red active" id="exitLightRed"></div>
+                                <div class="light light-green" id="exitLightGreen"></div>
+                            </div>
+                            <div class="barrier-post">
+                                <div class="barrier-arm" id="exitBarrierArm"></div>
+                            </div>
+                            <div class="gate-road">
+                                <div class="road-car" id="exitAnimatedCar">🚘</div>
+                            </div>
+                        </div>
+                        <div class="gate-status-text" id="exitGateStatusText">ไม้กั้นปิด: รอชำระเงินเพื่อผ่านทาง</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: Tickets History & Revenue Ledger -->
+            <section id="tab-tickets-history" class="tab-content">
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <div>
+                            <h2>ประวัติตั๋วจอดรถและรายการธุรกรรม (Ledger)</h2>
+                            <p class="text-muted">บันทึกสถานะตั๋ว ACTIVE, PAID, EXITED, LOST ทั้งหมดในระบบ</p>
+                        </div>
+                        <button class="btn-secondary" onclick="loadTicketsAndPayments()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                            รีเฟรชตาราง
+                        </button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Ticket ID</th>
+                                    <th>ทะเบียนรถ</th>
+                                    <th>ประเภทรถ</th>
+                                    <th>ชั้น / ช่องจอด</th>
+                                    <th>เวลาเข้า</th>
+                                    <th>เวลาออก</th>
+                                    <th>สถานะ</th>
+                                    <th>ค่าบริการ</th>
+                                    <th>การจัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ticketsTableBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: OOP Architecture & SOLID Explorer -->
+            <section id="tab-oop-docs" class="tab-content">
+                <div class="oop-docs-container">
+                    <div class="card glass-card">
+                        <div class="card-header">
+                            <div>
+                                <h2>สถาปัตยกรรมเชิงวัตถุ (OOP Architecture) & SOLID Principles</h2>
+                                <p class="text-muted">วิเคราะห์การประยุกต์ใช้แนวคิด OOP และ Design Patterns ในโค้ดจริงของระบบนี้</p>
+                            </div>
+                        </div>
+
+                        <!-- OOP 4 Pillars Grid -->
+                        <div class="pillars-grid">
+                            <div class="pillar-card">
+                                <div class="pillar-icon">🧩</div>
+                                <h3>1. Abstraction</h3>
+                                <p>คลาสแม่นามธรรม <code>Vehicle</code> และ <code>Payment</code> กำหนดสัญญา (Contracts) ชัดเจน ซ่อนรายละเอียดการทำงานภายใน เช่น เมธอด <code>canParkIn(Slot slot)</code> และ <code>processPayment()</code></p>
+                            </div>
+                            <div class="pillar-card">
+                                <div class="pillar-icon">🔒</div>
+                                <h3>2. Encapsulation</h3>
+                                <p>คลาส <code>Slot</code> และ <code>Ticket</code> ซ่อนตัวแปรภายใน (Private fields) ปกป้องความถูกต้องของ State ไม่อนุญาตให้แก้ไขสถานะโดยตรง ต้องผ่านเมธอด เช่น <code>assignVehicle()</code>, <code>release()</code>, <code>markPaid()</code></p>
+                            </div>
+                            <div class="pillar-card">
+                                <div class="pillar-icon">🌲</div>
+                                <h3>3. Inheritance</h3>
+                                <p>การสืบทอดคุณสมบัติที่สมเหตุสมผล <code>Car</code>, <code>Motorcycle</code>, <code>ElectricVehicle</code>, <code>Truck</code> สืบทอดจาก <code>Vehicle</code> และ <code>PromptPayPayment</code>, <code>CreditCardPayment</code>, <code>CashPayment</code> สืบทอดจาก <code>Payment</code></p>
+                            </div>
+                            <div class="pillar-card">
+                                <div class="pillar-icon">🎭</div>
+                                <h3>4. Polymorphism</h3>
+                                <p><strong>Double Dispatch</strong>: การให้ <code>slot.canFitVehicle(vehicle)</code> เรียกใช้ <code>vehicle.canParkIn(slot)</code> ซึ่งแต่ละ Subclass ของรถจะใช้อัลกอริทึมตรวจสอบตามขนาดและประเภทของช่องจอดอย่างยืดหยุ่น</p>
+                            </div>
+                        </div>
+
+                        <!-- Design Patterns Showcase -->
+                        <h3 class="mt-4">Design Patterns ที่ใช้ในระบบ</h3>
+                        <div class="patterns-grid">
+                            <div class="pattern-card">
+                                <div class="pattern-tag">Behavioral Pattern</div>
+                                <h4>Strategy Pattern (การคำนวณค่าบริการ)</h4>
+                                <p>แยกกฎการคำนวณค่าจอด (Pricing Rules) ออกเป็นคลาส Strategy: <code>StandardPricingStrategy</code>, <code>MotorcyclePricingStrategy</code>, <code>EVPricingStrategy</code> และ <code>TruckPricingStrategy</code> ทำให้สามารถเพิ่มโปรโมชันหรือปรับเปลี่ยนราคาได้โดยไม่ต้องแก้ไขคลาส Vehicle (ตามหลัก Open-Closed Principle)</p>
+                            </div>
+                            <div class="pattern-card">
+                                <div class="pattern-tag">Behavioral Pattern</div>
+                                <h4>Observer Pattern (ป้ายไฟทางเข้า DisplayBoard)</h4>
+                                <p><code>ParkingLot</code> เป็น Subject ที่ถือรายชื่อ <code>ParkingLotObserver</code> เมื่อมีการจอดหรือปลดปล่อยช่องจอด จะแจ้งเตือน <code>DisplayBoard</code> ให้ปรับปรุงจำนวนที่ว่างและข้อความเตือนแบบเรียลไทม์อัตโนมัติ</p>
+                            </div>
+                            <div class="pattern-card">
+                                <div class="pattern-tag">Creational Pattern</div>
+                                <h4>Factory Pattern (Vehicle & Slot Creation)</h4>
+                                <p><code>VehicleFactory</code> และ <code>SlotFactory</code> ช่วยจัดการการสร้างอินสแตนซ์ของออบเจกต์ตาม Type และ Parameter ที่รับเข้ามา รวมศูนย์ตรรกะการสร้างไว้ที่เดียว</p>
+                            </div>
+                            <div class="pattern-card">
+                                <div class="pattern-tag">Architectural Pattern</div>
+                                <h4>Facade & Clean Service Layer</h4>
+                                <p><code>ParkingService</code> ทำหน้าที่เป็น Facade รวบรวม Workflow ความสัมพันธ์ระหว่าง Aggregate Root (<code>ParkingLot</code>), Entities (<code>Slot</code>, <code>Ticket</code>), และ Repositories เข้าด้วยกัน</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 6: AI Operations & Explainable AI (XAI) Dashboard -->
+            <section id="tab-ai-ops" class="tab-content">
+                <div class="ai-dashboard-container">
+                    <!-- AI Hero Banner -->
+                    <div class="card glass-card ai-hero-card">
+                        <div class="ai-hero-content">
+                            <div class="ai-hero-badge">
+                                <span class="pulse-dot-ai"></span>
+                                <span>AI NEURAL ENGINE • EXPLAINABLE AI (XAI) ACTIVE</span>
+                            </div>
+                            <h2>ศูนย์ปฏิบัติการ AI & สถาปัตยกรรม Explainable AI (XAI)</h2>
+                            <p class="text-muted">
+                                ระบบปัญญาประดิษฐ์อัจฉริยะที่สนับสนุนการทำงานของลานจอดรถครบวงจร พร้อมคำอธิบายเหตุผลของการตัดสินใจทุกขั้นตอนอย่างโปร่งใส ตรวจสอบได้ และสอดคล้องกับหลักการ OOP & Responsible AI
+                            </p>
+                        </div>
+                        <div class="ai-hero-actions">
+                            <button class="btn-ai-pill" onclick="loadAiPredictiveData()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                ซิงค์โมเดล AI สด
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- AI Key Performance Metrics -->
+                    <div class="ai-metrics-grid">
+                        <div class="ai-metric-card">
+                            <div class="ai-metric-icon">🎯</div>
+                            <div class="ai-metric-meta">
+                                <span class="ai-metric-label">ดัชนีประสิทธิภาพ AI (Efficiency Score)</span>
+                                <strong class="ai-metric-val text-highlight" id="aiMetricEfficiency">94.2%</strong>
+                                <span class="ai-metric-sub">สูงกว่าการจัดสรรแบบสุ่ม +18.5%</span>
+                            </div>
+                        </div>
+                        <div class="ai-metric-card">
+                            <div class="ai-metric-icon">🌱</div>
+                            <div class="ai-metric-meta">
+                                <span class="ai-metric-label">ลดการปล่อยก๊าซคาร์บอน (CO2 Saved)</span>
+                                <strong class="ai-metric-val text-success" id="aiMetricCarbon">5.4 kg</strong>
+                                <span class="ai-metric-sub">จากการลดการขับวนหาที่จอด</span>
+                            </div>
+                        </div>
+                        <div class="ai-metric-card">
+                            <div class="ai-metric-icon">⚡</div>
+                            <div class="ai-metric-meta">
+                                <span class="ai-metric-label">ความเร็วประมวลผลการจัดสรร</span>
+                                <strong class="ai-metric-val text-cyan">0.08 วินาที</strong>
+                                <span class="ai-metric-sub">Multi-Criteria Optimization Matrix</span>
+                            </div>
+                        </div>
+                        <div class="ai-metric-card">
+                            <div class="ai-metric-icon">🛡️</div>
+                            <div class="ai-metric-meta">
+                                <span class="ai-metric-label">ระดับความโปร่งใส (XAI Score)</span>
+                                <strong class="ai-metric-val text-purple">100%</strong>
+                                <span class="ai-metric-sub">ตรวจสอบได้ทุก Factor ไร้ Black-box</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Predictive Occupancy & Dynamic Pricing -->
+                    <div class="ai-two-col-grid">
+                        <!-- 24-Hour Traffic Curve Forecast -->
+                        <div class="card glass-card">
+                            <div class="card-header">
+                                <div>
+                                    <h3>พยากรณ์ความหนาแน่น 24 ชั่วโมง & Dynamic Pricing</h3>
+                                    <p class="text-muted">AI คาดการณ์ความต้องการเข้าจอดตามช่วงเวลาจำลอง</p>
+                                </div>
+                                <span class="status-tag active" id="aiCurrentTrafficStatus">ปกติ (Steady State)</span>
+                            </div>
+
+                            <div class="dynamic-price-box">
+                                <div class="price-advice-header">
+                                    <span class="badge-pill">คำแนะนำกลยุทธ์ราคา AI</span>
+                                    <strong id="aiSurgeMultiplierText" class="text-highlight">ตัวคูณอัตรา: 1.0x (Standard)</strong>
+                                </div>
+                                <div class="price-advice-desc" id="aiDynamicPricingAdvice">
+                                    อัตรามาตรฐานตาม Pricing Strategy ประจำประเภทรถ
+                                </div>
+                                <div class="price-advice-xai">
+                                    <span class="xai-chip">เหตุผล AI:</span>
+                                    <span id="aiPredictorXaiText">อัตราการเข้าและออกอยู่ในจุดสมดุล ระบบทำงานราบรื่น</span>
+                                </div>
+                            </div>
+
+                            <!-- Forecast Bar Visualization -->
+                            <div class="forecast-bars-container" id="aiForecastBarsContainer">
+                                <!-- Rendered dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- AI Executive Insights -->
+                        <div class="card glass-card">
+                            <div class="card-header">
+                                <div>
+                                    <h3>บทวิเคราะห์เชิงกลยุทธ์สำหรับผู้บริหาร (Executive Insights)</h3>
+                                    <p class="text-muted">คำแนะนำอัตโนมัติจากการประมวลผล Big Data ในระบบ</p>
+                                </div>
+                            </div>
+
+                            <div class="ai-exec-summary-box" id="aiExecutiveSummaryText">
+                                ภาพรวมลานจอดรถทำงานอยู่ในเกณฑ์ดีเยี่ยม (Efficiency 94.2%) การจัดสรรด้วย AI ช่วยลดเวลาการวนรถหาที่จอดลง 65% เมื่อเทียบกับการจอดแบบสุ่ม
+                            </div>
+
+                            <div class="ai-recommendations-list" id="aiExecRecommendationsList">
+                                <!-- Rendered dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Explainable AI (XAI) Model Card & Architecture -->
+                    <div class="card glass-card mt-4">
+                        <div class="card-header">
+                            <div>
+                                <h3>โมเดลการทำงานและสถาปัตยกรรม Explainable AI (XAI) ในระบบนี้</h3>
+                                <p class="text-muted">หลักการเบื้องหลังที่ทำให้ AI ของระบบนี้โปร่งใส ปลอดภัย และเชื่อมต่อกับ OOP ได้อย่างสมบูรณ์แบบ</p>
+                            </div>
+                        </div>
+
+                        <div class="xai-pillars-grid">
+                            <div class="xai-card">
+                                <div class="xai-badge">โมดูลที่ 1</div>
+                                <h4>Multi-Criteria Heuristic Matrix (การคัดสรรช่องจอด)</h4>
+                                <p>แทนที่จะใช้ Neural Network ที่เป็น Black-box ซึ่งตัดสินใจโดยไม่มีเหตุผลชัดเจน ระบบใช้ Multi-Criteria Decision Analysis (MCDA) คำนวณคะแนนตาม 4 มิติ:</p>
+                                <ul class="xai-list">
+                                    <li><strong>Vehicle Dimension Fitting (30%):</strong> รถขนาดไหนควรลงช่องขนาดนั้น ไม่แย่งช่องรถใหญ่</li>
+                                    <li><strong>EV Charge Preservation (35%):</strong> สงวนจุดชาร์จ EV ให้รถที่จำเป็นจริง</li>
+                                    <li><strong>Proximity & Walking Distance (20%):</strong> ระยะทางเดินถึงลิฟต์และประตูทางออก</li>
+                                    <li><strong>Floor Congestion Load Balancing (15%):</strong> กระจายรถขึ้นชั้น 2-3 เมื่อชั้น 1 หนาแน่นเกิน 75%</li>
+                                </ul>
+                            </div>
+
+                            <div class="xai-card">
+                                <div class="xai-badge">โมดูลที่ 2</div>
+                                <h4>Computer Vision & ANPR Simulation (การตรวจจับป้ายทะเบียน)</h4>
+                                <p>จำลองการทำงานของ Edge Vision Camera:</p>
+                                <ul class="xai-list">
+                                    <li><strong>Plate Localization:</strong> ตรวจจับพิกัดสี่เหลี่ยมผืนผ้าของแผ่นป้ายทะเบียนไทย</li>
+                                    <li><strong>OCR Character Extraction:</strong> สกัดตัวอักษรและตัวเลขพร้อม Confidence Score (>98%)</li>
+                                    <li><strong>Visual Chassis Classifier:</strong> สังเกตรูปร่างทรงรถ (2 ล้อ = มอเตอร์ไซค์, มีพอร์ตชาร์จไฟ = EV, ตัวถังสูงเกิน 2.2m = รถบรรทุก)</li>
+                                </ul>
+                            </div>
+
+                            <div class="xai-card">
+                                <div class="xai-badge">โมดูลที่ 3</div>
+                                <h4>OOP & SOLID Integration (ความสอดคล้องกับสถาปัตยกรรมระบบ)</h4>
+                                <p>AI ไม่ได้ถูกเขียนแยกเป็นส่วนแปลกปลอม แต่ถูกออกแบบให้เข้ากับหลัก OOP อย่างเคร่งครัด:</p>
+                                <ul class="xai-list">
+                                    <li><strong>Single Responsibility:</strong> <code>AIParkingService</code> มีหน้าที่วิเคราะห์และให้คำแนะนำเท่านั้น ไม่ยุ่งเกี่ยวกับการบันทึกเงินหรือเปลี่ยน Invariant ใน Entity</li>
+                                    <li><strong>Open-Closed:</strong> สามารถสลับโมเดล AI หรือเพิ่มเกณฑ์การให้คะแนนใหม่ได้โดยไม่ต้องแก้ไข <code>ParkingLot</code> หรือ <code>Slot</code></li>
+                                    <li><strong>High Cohesion:</strong> ผลลัพธ์ส่งออกในรูป <code>AIRecommendation</code> ที่เก็บทั้งผลลัพธ์และคำอธิบาย XAI ไว้อย่างครบถ้วน</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 4: AI Copilot Interactive Console -->
+                    <div class="card glass-card mt-4">
+                        <div class="card-header">
+                            <div>
+                                <h3>AI Copilot Interactive Console (ผู้ช่วยอัจฉริยะ)</h3>
+                                <p class="text-muted">สอบถามสถานะ คำแนะนำเชิงลึก หรือข้อมูลสถาปัตยกรรมระบบได้แบบเรียลไทม์</p>
+                            </div>
+                        </div>
+
+                        <div class="copilot-console-layout">
+                            <!-- Quick Prompts Chips -->
+                            <div class="copilot-prompts-bar">
+                                <span class="text-muted" style="font-size: 0.85rem;">คำถามแนะนำ:</span>
+                                <button class="chip-prompt" onclick="sendQuickCopilotPrompt('มีที่จอดว่างชั้นไหนบ้าง?')">มีที่จอดว่างชั้นไหนบ้าง?</button>
+                                <button class="chip-prompt" onclick="sendQuickCopilotPrompt('รายได้สะสมของระบบขณะนี้เท่าไหร่?')">รายได้สะสมเท่าไหร่?</button>
+                                <button class="chip-prompt" onclick="sendQuickCopilotPrompt('จุดชาร์จ EV มีเงื่อนไขการใช้งานอย่างไร?')">เงื่อนไขจุดชาร์จ EV</button>
+                                <button class="chip-prompt" onclick="sendQuickCopilotPrompt('อัตราค่าบริการคิดอย่างไรตาม Strategy?')">กลยุทธ์คิดเงิน</button>
+                                <button class="chip-prompt" onclick="sendQuickCopilotPrompt('อธิบายหลักการ OOP ของระบบนี้')">อธิบายหลักการ OOP</button>
+                            </div>
+
+                            <!-- Chat Messages Log -->
+                            <div class="copilot-chat-log" id="aiCopilotChatLog">
+                                <div class="chat-bubble ai">
+                                    <div class="bubble-header">
+                                        <span class="bubble-author">🤖 AI Smart Parking Copilot</span>
+                                        <span class="bubble-time">เมื่อสักครู่</span>
+                                    </div>
+                                    <div class="bubble-content">
+                                        สวัสดีครับ! ผมคือ AI Copilot ผู้ช่วยประจำระบบบริหารลานจอดรถอัจฉริยะ สามารถสอบถามข้อมูลสถานะช่องจอดสด, สถิติรายได้, พยากรณ์ความหนาแน่น หรือคำอธิบายเชิงสถาปัตยกรรม OOP ได้ทันทีครับ
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Chat Input Box -->
+                            <div class="copilot-input-group">
+                                <input type="text" id="copilotInputText" class="form-input" placeholder="พิมพ์คำถามที่ต้องการ เช่น 'ชั้น 1 ว่างกี่ช่อง', 'ทำไมถึงแนะนำช่องนี้'..." onkeypress="handleCopilotKeyPress(event)">
+                                <button class="btn-primary" onclick="submitCopilotChat()">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                    <span>ส่งคำถาม</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Ticket Issued Modal -->
+    <div class="modal-overlay" id="ticketModalOverlay">
+        <div class="ticket-modal">
+            <button class="modal-close-btn" onclick="closeModal('ticketModalOverlay')">&times;</button>
+            <div class="ticket-printable" id="printableTicket">
+                <div class="ticket-brand">SMART PARKING PLAZA</div>
+                <div class="ticket-subtitle">PARKING TICKET • บัตรจอดรถ</div>
+                <div class="ticket-divider-dash"></div>
+                
+                <div class="ticket-row">
+                    <span>เลขที่ตั๋ว:</span>
+                    <strong id="modalTicketId" class="mono text-highlight">TKT-0000</strong>
+                </div>
+                <div class="ticket-row">
+                    <span>ทะเบียนรถ:</span>
+                    <strong id="modalPlate">กก-1234</strong>
+                </div>
+                <div class="ticket-row">
+                    <span>ประเภทรถ:</span>
+                    <span id="modalType">รถยนต์ทั่วไป</span>
+                </div>
+                <div class="ticket-row">
+                    <span>ช่องจอดแนะนำ:</span>
+                    <strong id="modalSlot" class="slot-badge">F1-01</strong>
+                </div>
+                <div class="ticket-row">
+                    <span>เวลาเข้าจอด:</span>
+                    <span id="modalEntryTime" class="mono">2026-09-09 10:00:00</span>
+                </div>
+                
+                <div class="ticket-divider-dash"></div>
+                <div class="ticket-rate-box">
+                    <div class="ticket-rate-title" id="modalRateName">Standard Rate</div>
+                    <div class="ticket-rate-desc" id="modalRateDesc">ฟรี 15 นาทีแรก</div>
+                </div>
+
+                <div class="barcode-visual">
+                    <div class="barcode-lines"></div>
+                    <div class="barcode-text" id="modalBarcodeText">TKT-XXXX-XXXX</div>
+                </div>
+                <div class="ticket-footer-text">
+                    * โปรดเก็บตั๋วนี้ไว้เพื่อใช้ชำระเงินที่จุดตรวจทางออก *<br>
+                    กรณีตั๋วสูญหายมีค่าปรับ 300 บาท
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="window.print()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    พิมพ์ตั๋ว
+                </button>
+                <button class="btn-primary" onclick="closeModal('ticketModalOverlay')">เข้าใจแล้ว / ปิด</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Receipt Modal -->
+    <div class="modal-overlay" id="receiptModalOverlay">
+        <div class="ticket-modal">
+            <button class="modal-close-btn" onclick="closeModal('receiptModalOverlay')">&times;</button>
+            <div class="ticket-printable" id="printableReceipt">
+                <div class="receipt-check-icon">✓</div>
+                <div class="ticket-brand">PAYMENT RECEIPT</div>
+                <div class="ticket-subtitle">ใบเสร็จรับเงินค่าบริการจอดรถ</div>
+                <div class="ticket-divider-dash"></div>
+                
+                <div class="ticket-row">
+                    <span>เลขที่ใบเสร็จ:</span>
+                    <strong id="rcpPaymentId" class="mono">PAY-0000</strong>
+                </div>
+                <div class="ticket-row">
+                    <span>เลขอ้างอิงธุรกรรม:</span>
+                    <strong id="rcpRef" class="mono text-highlight">-</strong>
+                </div>
+                <div class="ticket-row">
+                    <span>เลขที่ตั๋ว:</span>
+                    <span id="rcpTicketId" class="mono">-</span>
+                </div>
+                <div class="ticket-row">
+                    <span>ทะเบียนรถ:</span>
+                    <strong id="rcpPlate">-</strong>
+                </div>
+                <div class="ticket-row">
+                    <span>ช่องทางชำระ:</span>
+                    <span id="rcpMethod" class="badge-pill">PromptPay</span>
+                </div>
+                <div class="ticket-row">
+                    <span>เวลาทำรายการ:</span>
+                    <span id="rcpTime" class="mono">-</span>
+                </div>
+                
+                <div class="ticket-divider-dash"></div>
+                
+                <div class="ticket-row amount-total-row">
+                    <span>ยอดชำระสุทธิ:</span>
+                    <strong id="rcpAmount" class="text-success text-lg">฿0.00</strong>
+                </div>
+                <div id="rcpCashDetailsRow" class="ticket-row text-muted" style="display: none;">
+                    <span>รับเงินมา: <span id="rcpCashTendered">฿0.00</span></span>
+                    <span>เงินทอน: <span id="rcpChange">฿0.00</span></span>
+                </div>
+
+                <div class="ticket-footer-text mt-3">
+                    ไม้กั้นทางออกเปิดแล้ว ขอบคุณที่ใช้บริการ<br>
+                    ขอให้เดินทางโดยสวัสดิภาพ
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-primary btn-block" onclick="finishPaymentAndOpenExitGate()">
+                    เปิดไม้กั้น & เดินทางออก (Open Exit Gate)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slot Details Quick Modal -->
+    <div class="modal-overlay" id="slotDetailModalOverlay">
+        <div class="ticket-modal slot-detail-modal">
+            <button class="modal-close-btn" onclick="closeModal('slotDetailModalOverlay')">&times;</button>
+            <div class="card-header">
+                <h2 id="slotModalNumber">F1-01</h2>
+                <span id="slotModalStatusBadge" class="status-badge available">ว่าง</span>
+            </div>
+            <div class="slot-detail-body" id="slotModalBody">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+    <!-- Floating AI Copilot Launcher Button -->
+    <div class="floating-ai-launcher" id="floatingAiLauncher" onclick="toggleFloatingCopilot()" title="เปิด AI ผู้ช่วยอัจฉริยะ">
+        <div class="ai-launcher-icon">
+            <span class="ai-sparkle">✨</span>
+            <span class="ai-robot-face">🤖</span>
+        </div>
+        <span class="ai-launcher-text">ถาม AI ผู้ช่วย</span>
+    </div>
+
+    <!-- Floating AI Copilot Window -->
+    <div class="floating-copilot-window" id="floatingCopilotWindow">
+        <div class="copilot-window-header">
+            <div class="copilot-header-brand">
+                <span class="pulse-dot-ai"></span>
+                <strong>AI Smart Copilot</strong>
+                <span class="copilot-model-tag">OOP Grounded</span>
+            </div>
+            <button class="copilot-close-btn" onclick="toggleFloatingCopilot()">&times;</button>
+        </div>
+        <div class="floating-chat-log" id="floatingChatLog">
+            <div class="chat-bubble ai">
+                <div class="bubble-header">
+                    <span class="bubble-author">🤖 AI Assistant</span>
+                    <span class="bubble-time">สด</span>
+                </div>
+                <div class="bubble-content">
+                    สวัสดีครับ! ผมคือ AI ประจำลานจอดรถ มีคำถามเรื่องที่จอดว่าง รายได้ หรือการคำนวณค่าจอด ถามผมได้เลยครับ!
+                </div>
+            </div>
+        </div>
+        <div class="floating-quick-chips">
+            <button onclick="sendFloatingPrompt('ที่จอดชั้นไหนว่างสุด?')">ชั้นไหนว่างสุด?</button>
+            <button onclick="sendFloatingPrompt('รายได้สะสมตอนนี้?')">รายได้ตอนนี้?</button>
+            <button onclick="sendFloatingPrompt('จุดชาร์จ EV ว่างไหม?')">จุดชาร์จ EV?</button>
+        </div>
+        <div class="floating-input-row">
+            <input type="text" id="floatingCopilotInput" placeholder="ถาม AI ได้ที่นี่..." onkeypress="handleFloatingCopilotKeyPress(event)">
+            <button class="btn-primary" onclick="submitFloatingCopilotChat()">ส่ง</button>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

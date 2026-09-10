@@ -1,0 +1,1935 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="เอกสารสรุปการทำงานระบบ Smart Parking Management System - ระบบบริหารจัดการที่จอดรถอัจฉริยะ พร้อม AI และ OOP Architecture">
+    <title>📖 System Overview - Smart Parking Management System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* ========== CSS Variables & Design Tokens ========== */
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-card: rgba(17, 24, 39, 0.7);
+            --bg-glass: rgba(255,255,255,0.04);
+            --border-glass: rgba(255,255,255,0.08);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --accent-purple: #8b5cf6;
+            --accent-pink: #ec4899;
+            --accent-green: #10b981;
+            --accent-orange: #f59e0b;
+            --accent-red: #ef4444;
+            --gradient-hero: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+            --gradient-card: linear-gradient(145deg, rgba(59,130,246,0.08) 0%, rgba(139,92,246,0.05) 100%);
+            --gradient-ai: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
+            --shadow-glow: 0 0 40px rgba(59,130,246,0.15);
+            --shadow-card: 0 8px 32px rgba(0,0,0,0.3);
+            --radius-lg: 20px;
+            --radius-md: 14px;
+            --radius-sm: 8px;
+        }
+
+        /* ========== Reset & Global ========== */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        /* ========== Animated Background ========== */
+        .bg-animation {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -1;
+            overflow: hidden;
+        }
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(ellipse at 20% 50%, rgba(59,130,246,0.08) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 20%, rgba(139,92,246,0.06) 0%, transparent 50%),
+                        radial-gradient(ellipse at 50% 80%, rgba(236,72,153,0.04) 0%, transparent 50%);
+            animation: bgPulse 15s ease-in-out infinite alternate;
+        }
+        @keyframes bgPulse {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-5%, 3%) scale(1.05); }
+            100% { transform: translate(3%, -2%) scale(1); }
+        }
+
+        /* ========== Scrollbar ========== */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.3); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(59,130,246,0.5); }
+
+        /* ========== Navigation ========== */
+        .nav-bar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 1000;
+            background: rgba(10,14,26,0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-glass);
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+            transition: all 0.3s;
+        }
+        .nav-bar.scrolled { background: rgba(10,14,26,0.95); box-shadow: 0 4px 30px rgba(0,0,0,0.3); }
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+        .nav-logo-icon {
+            width: 36px; height: 36px;
+            background: var(--gradient-hero);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 0 20px rgba(59,130,246,0.3);
+        }
+        .nav-logo-text {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+        }
+        .nav-links {
+            display: flex;
+            gap: 6px;
+            list-style: none;
+            flex-wrap: wrap;
+        }
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.82rem;
+            font-weight: 500;
+            padding: 8px 14px;
+            border-radius: var(--radius-sm);
+            transition: all 0.25s;
+            white-space: nowrap;
+        }
+        .nav-links a:hover, .nav-links a.active {
+            color: var(--text-primary);
+            background: rgba(59,130,246,0.12);
+        }
+        .nav-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--accent-cyan);
+            text-decoration: none;
+            font-size: 0.82rem;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(6,182,212,0.3);
+            transition: all 0.25s;
+        }
+        .nav-back:hover {
+            background: rgba(6,182,212,0.1);
+            border-color: rgba(6,182,212,0.5);
+        }
+
+        /* ========== Hero Section ========== */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 100px 2rem 60px;
+            position: relative;
+        }
+        .hero-content { max-width: 900px; position: relative; z-index: 2; }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(59,130,246,0.1);
+            border: 1px solid rgba(59,130,246,0.2);
+            padding: 8px 20px;
+            border-radius: 50px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: var(--accent-blue);
+            margin-bottom: 24px;
+            animation: fadeInUp 0.6s ease-out;
+        }
+        .hero-badge .pulse-dot {
+            width: 8px; height: 8px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.3); }
+        }
+        .hero h1 {
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 900;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+            margin-bottom: 20px;
+            animation: fadeInUp 0.6s ease-out 0.1s both;
+        }
+        .hero h1 .gradient-text {
+            background: var(--gradient-hero);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-subtitle {
+            font-size: clamp(1rem, 2vw, 1.25rem);
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto 40px;
+            animation: fadeInUp 0.6s ease-out 0.2s both;
+        }
+        .hero-stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+            animation: fadeInUp 0.6s ease-out 0.3s both;
+        }
+        .hero-stat {
+            text-align: center;
+        }
+        .hero-stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: var(--gradient-hero);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-stat-label {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ========== Floating Particles ========== */
+        .hero-particles {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+        }
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            opacity: 0.2;
+            animation: float 20s infinite linear;
+        }
+        @keyframes float {
+            0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10% { opacity: 0.2; }
+            90% { opacity: 0.2; }
+            100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
+        }
+
+        /* ========== Section ========== */
+        .section {
+            padding: 80px 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .section-header {
+            text-align: center;
+            margin-bottom: 56px;
+        }
+        .section-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--accent-blue);
+            margin-bottom: 12px;
+        }
+        .section-title {
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 16px;
+        }
+        .section-desc {
+            font-size: 1.05rem;
+            color: var(--text-secondary);
+            max-width: 650px;
+            margin: 0 auto;
+        }
+
+        /* ========== Card ========== */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            backdrop-filter: blur(12px);
+            transition: all 0.35s;
+            position: relative;
+            overflow: hidden;
+        }
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: var(--gradient-hero);
+            opacity: 0;
+            transition: opacity 0.35s;
+        }
+        .card:hover {
+            border-color: rgba(59,130,246,0.2);
+            box-shadow: var(--shadow-glow);
+            transform: translateY(-4px);
+        }
+        .card:hover::before { opacity: 1; }
+
+        .card-icon {
+            width: 56px; height: 56px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .card-desc {
+            color: var(--text-secondary);
+            font-size: 0.92rem;
+            line-height: 1.7;
+        }
+
+        /* ========== Grid Layouts ========== */
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+
+        /* ========== Architecture Diagram ========== */
+        .arch-diagram {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-lg);
+            padding: 48px 32px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .arch-layers {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .arch-layer {
+            padding: 20px 32px;
+            border-radius: var(--radius-md);
+            border: 1px solid;
+            position: relative;
+            transition: all 0.3s;
+        }
+        .arch-layer:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 30px rgba(0,0,0,0.2);
+        }
+        .arch-layer-name {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+        .arch-layer-desc {
+            font-size: 0.82rem;
+            opacity: 0.8;
+        }
+        .arch-arrow {
+            text-align: center;
+            font-size: 1.5rem;
+            color: var(--text-muted);
+            margin: -8px 0;
+            position: relative;
+            z-index: 2;
+        }
+        .layer-frontend {
+            background: rgba(6,182,212,0.1);
+            border-color: rgba(6,182,212,0.3);
+            color: var(--accent-cyan);
+        }
+        .layer-server {
+            background: rgba(59,130,246,0.1);
+            border-color: rgba(59,130,246,0.3);
+            color: var(--accent-blue);
+        }
+        .layer-service {
+            background: rgba(139,92,246,0.1);
+            border-color: rgba(139,92,246,0.3);
+            color: var(--accent-purple);
+        }
+        .layer-ai {
+            background: rgba(236,72,153,0.1);
+            border-color: rgba(236,72,153,0.3);
+            color: var(--accent-pink);
+        }
+        .layer-domain {
+            background: rgba(16,185,129,0.1);
+            border-color: rgba(16,185,129,0.3);
+            color: var(--accent-green);
+        }
+        .layer-repo {
+            background: rgba(245,158,11,0.1);
+            border-color: rgba(245,158,11,0.3);
+            color: var(--accent-orange);
+        }
+
+        /* ========== OOP Pillars ========== */
+        .oop-pillar {
+            position: relative;
+            padding-left: 20px;
+        }
+        .oop-pillar::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 4px;
+            border-radius: 2px;
+        }
+        .oop-pillar.abstraction::before { background: var(--accent-blue); }
+        .oop-pillar.encapsulation::before { background: var(--accent-purple); }
+        .oop-pillar.inheritance::before { background: var(--accent-green); }
+        .oop-pillar.polymorphism::before { background: var(--accent-pink); }
+
+        /* ========== Device Integration ========== */
+        .device-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            padding: 24px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-md);
+            transition: all 0.3s;
+        }
+        .device-card:hover {
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(255,255,255,0.12);
+            transform: translateX(4px);
+        }
+        .device-icon {
+            width: 52px; height: 52px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            flex-shrink: 0;
+        }
+        .device-info h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .device-info p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        .device-tag {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 50px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        /* ========== Flow Chart ========== */
+        .flow-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-top: 32px;
+        }
+        .flow-step {
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            padding: 16px 24px;
+            border-radius: var(--radius-md);
+            text-align: center;
+            min-width: 140px;
+            transition: all 0.3s;
+        }
+        .flow-step:hover {
+            background: rgba(59,130,246,0.1);
+            border-color: rgba(59,130,246,0.3);
+            transform: translateY(-3px);
+        }
+        .flow-step-icon { font-size: 2rem; margin-bottom: 8px; }
+        .flow-step-label {
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+        .flow-step-desc {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        .flow-arrow {
+            font-size: 1.5rem;
+            color: var(--text-muted);
+        }
+
+        /* ========== AI Feature Showcase ========== */
+        .ai-showcase {
+            background: linear-gradient(145deg, rgba(6,182,212,0.05) 0%, rgba(139,92,246,0.05) 100%);
+            border: 1px solid rgba(6,182,212,0.15);
+            border-radius: var(--radius-lg);
+            padding: 40px;
+            position: relative;
+        }
+        .ai-showcase::after {
+            content: '';
+            position: absolute;
+            top: -1px; left: 50px; right: 50px;
+            height: 2px;
+            background: var(--gradient-ai);
+            border-radius: 1px;
+        }
+        .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 16px;
+            background: rgba(6,182,212,0.1);
+            border: 1px solid rgba(6,182,212,0.2);
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            margin-bottom: 16px;
+        }
+        .ai-feature-list {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+        .ai-feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 16px;
+            background: rgba(0,0,0,0.2);
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(255,255,255,0.04);
+            transition: all 0.25s;
+        }
+        .ai-feature-item:hover {
+            background: rgba(6,182,212,0.06);
+            border-color: rgba(6,182,212,0.15);
+        }
+        .ai-feature-num {
+            width: 32px; height: 32px;
+            border-radius: 10px;
+            background: var(--gradient-ai);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.82rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .ai-feature-text h4 {
+            font-size: 0.92rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .ai-feature-text p {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* ========== Pattern Card ========== */
+        .pattern-card {
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-md);
+            padding: 24px;
+            transition: all 0.3s;
+        }
+        .pattern-card:hover {
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(139,92,246,0.25);
+        }
+        .pattern-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        .pattern-emoji { font-size: 1.4rem; }
+        .pattern-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+        .pattern-files {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .pattern-file {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            padding: 4px 10px;
+            background: rgba(139,92,246,0.1);
+            border: 1px solid rgba(139,92,246,0.2);
+            border-radius: 50px;
+            color: var(--accent-purple);
+        }
+
+        /* ========== File Tree ========== */
+        .file-tree {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-md);
+            padding: 28px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            line-height: 2;
+            overflow-x: auto;
+        }
+        .file-tree .dir { color: var(--accent-blue); font-weight: 600; }
+        .file-tree .java { color: var(--accent-orange); }
+        .file-tree .html { color: var(--accent-pink); }
+        .file-tree .css { color: var(--accent-cyan); }
+        .file-tree .js { color: var(--accent-green); }
+        .file-tree .bat { color: var(--accent-purple); }
+        .file-tree .md { color: var(--text-secondary); }
+        .file-tree .comment { color: var(--text-muted); font-style: italic; }
+
+        /* ========== API Table ========== */
+        .api-table-wrap {
+            overflow-x: auto;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-glass);
+        }
+        .api-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .api-table thead {
+            background: rgba(59,130,246,0.1);
+        }
+        .api-table th {
+            padding: 14px 18px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--accent-blue);
+            border-bottom: 1px solid var(--border-glass);
+            white-space: nowrap;
+        }
+        .api-table td {
+            padding: 12px 18px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            vertical-align: top;
+        }
+        .api-table tr:hover td {
+            background: rgba(59,130,246,0.03);
+        }
+        .method-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 50px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .method-get { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+        .method-post { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+        .api-path {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--accent-cyan);
+        }
+
+        /* ========== Pricing Table ========== */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 20px;
+        }
+        .pricing-card {
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-md);
+            padding: 28px;
+            text-align: center;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .pricing-card:hover {
+            border-color: rgba(59,130,246,0.25);
+            transform: translateY(-4px);
+        }
+        .pricing-card-icon {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+        }
+        .pricing-card-name {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .pricing-card-strategy {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 16px;
+        }
+        .pricing-card-rate {
+            font-size: 2rem;
+            font-weight: 800;
+            background: var(--gradient-hero);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .pricing-card-unit {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+        .pricing-card-free {
+            margin-top: 12px;
+            padding: 6px 14px;
+            background: rgba(16,185,129,0.1);
+            border: 1px solid rgba(16,185,129,0.2);
+            border-radius: 50px;
+            font-size: 0.75rem;
+            color: var(--accent-green);
+            display: inline-block;
+        }
+
+        /* ========== Timeline ========== */
+        .timeline {
+            position: relative;
+            padding-left: 40px;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 16px; top: 0; bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, var(--accent-blue), var(--accent-purple), var(--accent-pink));
+        }
+        .timeline-item {
+            position: relative;
+            margin-bottom: 32px;
+            padding: 20px 24px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-md);
+            transition: all 0.3s;
+        }
+        .timeline-item:hover {
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(59,130,246,0.2);
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -32px; top: 24px;
+            width: 14px; height: 14px;
+            background: var(--accent-blue);
+            border: 3px solid var(--bg-primary);
+            border-radius: 50%;
+        }
+        .timeline-item:nth-child(2)::before { background: var(--accent-purple); }
+        .timeline-item:nth-child(3)::before { background: var(--accent-green); }
+        .timeline-item:nth-child(4)::before { background: var(--accent-pink); }
+        .timeline-item:nth-child(5)::before { background: var(--accent-orange); }
+        .timeline-step {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--accent-blue);
+            margin-bottom: 6px;
+        }
+        .timeline-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .timeline-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.65;
+        }
+
+        /* ========== Tech Stack ========== */
+        .tech-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px 20px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-sm);
+            transition: all 0.25s;
+        }
+        .tech-item:hover {
+            background: rgba(255,255,255,0.06);
+        }
+        .tech-icon {
+            width: 40px; height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+        .tech-name { font-weight: 600; font-size: 0.92rem; }
+        .tech-desc { font-size: 0.78rem; color: var(--text-muted); }
+
+        /* ========== Footer ========== */
+        .footer {
+            text-align: center;
+            padding: 48px 2rem;
+            border-top: 1px solid var(--border-glass);
+            margin-top: 40px;
+        }
+        .footer-text {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.82rem;
+            transition: color 0.25s;
+        }
+        .footer-links a:hover { color: var(--accent-blue); }
+
+        /* ========== Tooltip ========== */
+        .tooltip-wrap {
+            position: relative;
+            cursor: help;
+            border-bottom: 1px dashed var(--text-muted);
+        }
+        .tooltip-wrap:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: var(--text-primary);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        /* ========== Highlight Box ========== */
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(139,92,246,0.06) 100%);
+            border: 1px solid rgba(59,130,246,0.15);
+            border-radius: var(--radius-md);
+            padding: 24px;
+            margin: 20px 0;
+        }
+        .highlight-box.warning {
+            background: linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(239,68,68,0.06) 100%);
+            border-color: rgba(245,158,11,0.15);
+        }
+
+        /* ========== Responsive ========== */
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .section { padding: 48px 1rem; }
+            .hero { padding: 80px 1rem 40px; }
+            .hero-stats { gap: 24px; }
+            .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+            .flow-container { flex-direction: column; }
+            .flow-arrow { transform: rotate(90deg); }
+            .arch-layers { gap: 12px; }
+            .card { padding: 24px; }
+        }
+
+        /* ========== Scroll Animations ========== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Animated Background -->
+    <div class="bg-animation"></div>
+
+    <!-- Navigation -->
+    <nav class="nav-bar" id="navbar">
+        <a href="#" class="nav-logo">
+            <div class="nav-logo-icon">🅿️</div>
+            <span class="nav-logo-text">Smart Parking System</span>
+        </a>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="#overview" class="active">ภาพรวม</a></li>
+            <li><a href="#architecture">สถาปัตยกรรม</a></li>
+            <li><a href="#workflow">การทำงาน</a></li>
+            <li><a href="#ai-features">ระบบ AI</a></li>
+            <li><a href="#devices">อุปกรณ์</a></li>
+            <li><a href="#oop">OOP & Patterns</a></li>
+            <li><a href="#api">API Endpoints</a></li>
+            <li><a href="#pricing">อัตราค่าบริการ</a></li>
+            <li><a href="#tech-stack">เทคโนโลยี</a></li>
+        </ul>
+        <a href="index.html" class="nav-back">← กลับสู่ระบบหลัก</a>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero" id="overview">
+        <div class="hero-particles">
+            <div class="particle" style="left:10%; width:6px; height:6px; background:var(--accent-blue); animation-delay:0s; animation-duration:18s;"></div>
+            <div class="particle" style="left:25%; width:4px; height:4px; background:var(--accent-purple); animation-delay:3s; animation-duration:22s;"></div>
+            <div class="particle" style="left:45%; width:8px; height:8px; background:var(--accent-cyan); animation-delay:6s; animation-duration:16s;"></div>
+            <div class="particle" style="left:65%; width:5px; height:5px; background:var(--accent-pink); animation-delay:2s; animation-duration:20s;"></div>
+            <div class="particle" style="left:80%; width:7px; height:7px; background:var(--accent-green); animation-delay:8s; animation-duration:24s;"></div>
+            <div class="particle" style="left:90%; width:4px; height:4px; background:var(--accent-orange); animation-delay:5s; animation-duration:19s;"></div>
+        </div>
+
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span class="pulse-dot"></span>
+                System Documentation v2.0 — อัปเดตล่าสุดพร้อม AI Integration
+            </div>
+            <h1>
+                <span class="gradient-text">Smart Parking</span><br>
+                Management System
+            </h1>
+            <p class="hero-subtitle">
+                เอกสารสรุปการทำงานของระบบบริหารจัดการลานจอดรถอัจฉริยะ ออกแบบตามหลัก Object-Oriented Programming (OOP), SOLID Principles, Design Patterns พร้อมระบบ AI ที่ช่วยแนะนำ วิเคราะห์ และทำงานอัตโนมัติ
+            </p>
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <div class="hero-stat-value">40+</div>
+                    <div class="hero-stat-label">Java Source Files</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-value">15</div>
+                    <div class="hero-stat-label">REST API Endpoints</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-value">5</div>
+                    <div class="hero-stat-label">AI Modules</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-value">4</div>
+                    <div class="hero-stat-label">Design Patterns</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION: ภาพรวมระบบ (System Overview) -->
+    <!-- ============================================================ -->
+    <section class="section" id="system-overview">
+        <div class="section-header reveal">
+            <div class="section-label">🏗️ System Overview</div>
+            <h2 class="section-title">ภาพรวมระบบ</h2>
+            <p class="section-desc">ระบบ Smart Parking Management System คือระบบจัดการลานจอดรถอัจฉริยะแบบครบวงจร ตั้งแต่รถเข้า-ออก การชำระเงิน ไปจนถึงการแนะนำด้วย AI</p>
+        </div>
+
+        <div class="grid-3 reveal">
+            <div class="card">
+                <div class="card-icon" style="background: rgba(59,130,246,0.12);">🚗</div>
+                <div class="card-title">การจัดการจอดรถ</div>
+                <div class="card-desc">
+                    รองรับยานพาหนะ 4 ประเภท: รถยนต์, มอเตอร์ไซค์, รถยนต์ไฟฟ้า (EV) และรถบรรทุก พร้อมระบบออกตั๋วอัตโนมัติ แอนิเมชันไม้กั้น และจัดสรรช่องจอดอัจฉริยะ
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-icon" style="background: rgba(16,185,129,0.12);">💳</div>
+                <div class="card-title">การชำระเงินหลากหลายช่องทาง</div>
+                <div class="card-desc">
+                    รองรับ 3 ช่องทางชำระเงิน: PromptPay QR Code, บัตรเครดิต/เดบิต และเงินสด พร้อมคำนวณเงินทอนอัตโนมัติ และออกใบเสร็จรับเงิน
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-icon" style="background: rgba(139,92,246,0.12);">🤖</div>
+                <div class="card-title">ระบบ AI อัจฉริยะ</div>
+                <div class="card-desc">
+                    ผสาน AI เข้ากับทุกขั้นตอน: แนะนำช่องจอดพร้อมเหตุผล (XAI), สแกนป้ายทะเบียนอัตโนมัติ (ANPR), พยากรณ์ความหนาแน่น และ AI Copilot Chatbot
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION: สถาปัตยกรรมระบบ (System Architecture) -->
+    <!-- ============================================================ -->
+    <section class="section" id="architecture">
+        <div class="section-header reveal">
+            <div class="section-label">📐 Architecture</div>
+            <h2 class="section-title">สถาปัตยกรรมระบบ</h2>
+            <p class="section-desc">ระบบออกแบบเป็น Layered Architecture แยกส่วนชัดเจน ตามหลัก Separation of Concerns</p>
+        </div>
+
+        <div class="arch-diagram reveal">
+            <div class="arch-layers">
+                <div class="arch-layer layer-frontend">
+                    <div class="arch-layer-name">🖥️ Presentation Layer (Frontend)</div>
+                    <div class="arch-layer-desc">index.html + style.css + app.js — Modern SPA ด้วย Glassmorphism Design, REST Client</div>
+                </div>
+                <div class="arch-arrow">⬇ HTTP REST API (JSON) ⬇</div>
+                <div class="arch-layer layer-server">
+                    <div class="arch-layer-name">🌐 Server Layer (ParkingServer.java)</div>
+                    <div class="arch-layer-desc">Pure Java SE HttpServer — ลงทะเบียน 15 API Endpoints, Static File Server, CORS</div>
+                </div>
+                <div class="arch-arrow">⬇ ⬇</div>
+                <div class="arch-layer layer-service">
+                    <div class="arch-layer-name">⚙️ Service Layer / Facade (ParkingService.java)</div>
+                    <div class="arch-layer-desc">Business Workflow Controller: Check-in, Check-out, Payment, Time Simulation</div>
+                </div>
+                <div class="arch-arrow">⬇ ⬇</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="arch-layer layer-ai">
+                        <div class="arch-layer-name">🤖 AI Layer (AIParkingService.java)</div>
+                        <div class="arch-layer-desc">XAI Recommendation, ANPR, Traffic Prediction, Copilot Chat</div>
+                    </div>
+                    <div class="arch-layer layer-domain">
+                        <div class="arch-layer-name">🏛️ Domain Layer (Models, Strategies, Factories)</div>
+                        <div class="arch-layer-desc">Vehicle, Slot, Ticket, ParkingLot, PricingStrategy, Observer</div>
+                    </div>
+                </div>
+                <div class="arch-arrow">⬇ ⬇</div>
+                <div class="arch-layer layer-repo">
+                    <div class="arch-layer-name">💾 Repository Layer (In-Memory Storage)</div>
+                    <div class="arch-layer-desc">TicketRepository + PaymentRepository — ข้อมูลเก็บใน ConcurrentHashMap</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- File Structure -->
+        <div style="margin-top: 40px;" class="reveal">
+            <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 20px; text-align: center;">📁 โครงสร้างโปรเจกต์ (Project Structure)</h3>
+            <div class="file-tree">
+<pre>
+<span class="dir">IDe/</span>
+├── <span class="dir">src/</span>
+│   ├── <span class="dir">domain/</span>
+│   │   ├── <span class="dir">ai/</span>
+│   │   │   ├── <span class="java">AIParkingService.java</span>     <span class="comment"># AI Core: XAI, ANPR, Prediction, Copilot</span>
+│   │   │   └── <span class="java">AIRecommendation.java</span>     <span class="comment"># AI Recommendation Data Model</span>
+│   │   ├── <span class="dir">enums/</span>
+│   │   │   ├── <span class="java">VehicleType.java</span>          <span class="comment"># CAR, MOTORCYCLE, ELECTRIC_VEHICLE, TRUCK</span>
+│   │   │   ├── <span class="java">SlotType.java</span>             <span class="comment"># STANDARD, COMPACT, MOTORCYCLE, LARGE, EV_CHARGING</span>
+│   │   │   ├── <span class="java">SlotStatus.java</span>           <span class="comment"># AVAILABLE, OCCUPIED, RESERVED, MAINTENANCE</span>
+│   │   │   ├── <span class="java">TicketStatus.java</span>         <span class="comment"># ACTIVE, PAID, EXITED, LOST</span>
+│   │   │   ├── <span class="java">PaymentStatus.java</span>        <span class="comment"># PENDING, SUCCESS, FAILED</span>
+│   │   │   └── <span class="java">PaymentMethod.java</span>        <span class="comment"># PROMPTPAY, CREDIT_CARD, CASH</span>
+│   │   ├── <span class="dir">model/</span>
+│   │   │   ├── <span class="java">Vehicle.java</span>              <span class="comment"># Abstract Base Class สำหรับยานพาหนะ</span>
+│   │   │   ├── <span class="java">Car.java</span>                  <span class="comment"># รถยนต์ส่วนบุคคล</span>
+│   │   │   ├── <span class="java">Motorcycle.java</span>           <span class="comment"># รถจักรยานยนต์</span>
+│   │   │   ├── <span class="java">ElectricVehicle.java</span>      <span class="comment"># รถยนต์ไฟฟ้า (EV)</span>
+│   │   │   ├── <span class="java">Truck.java</span>                <span class="comment"># รถบรรทุก/รถใหญ่</span>
+│   │   │   ├── <span class="java">Slot.java</span>                 <span class="comment"># ช่องจอดรถ (Encapsulated State)</span>
+│   │   │   ├── <span class="java">ParkingFloor.java</span>         <span class="comment"># ชั้นจอดรถ</span>
+│   │   │   ├── <span class="java">ParkingLot.java</span>           <span class="comment"># Aggregate Root + Observer</span>
+│   │   │   └── <span class="java">Ticket.java</span>               <span class="comment"># ตั๋วจอดรถ (State Machine)</span>
+│   │   ├── <span class="dir">strategy/</span>
+│   │   │   ├── <span class="java">PricingStrategy.java</span>      <span class="comment"># Interface กลยุทธ์คิดราคา</span>
+│   │   │   ├── <span class="java">StandardPricingStrategy.java</span>
+│   │   │   ├── <span class="java">MotorcyclePricingStrategy.java</span>
+│   │   │   ├── <span class="java">EVPricingStrategy.java</span>
+│   │   │   ├── <span class="java">TruckPricingStrategy.java</span>
+│   │   │   ├── <span class="java">SlotAllocationStrategy.java</span> <span class="comment"># Interface จัดสรรช่อง</span>
+│   │   │   └── <span class="java">NearestFirstAllocationStrategy.java</span>
+│   │   ├── <span class="dir">observer/</span>
+│   │   │   ├── <span class="java">ParkingLotObserver.java</span>    <span class="comment"># Observer Interface</span>
+│   │   │   └── <span class="java">DisplayBoard.java</span>         <span class="comment"># ป้ายไฟแสดงที่ว่าง</span>
+│   │   ├── <span class="dir">factory/</span>
+│   │   │   ├── <span class="java">VehicleFactory.java</span>       <span class="comment"># สร้างรถตาม Type</span>
+│   │   │   └── <span class="java">SlotFactory.java</span>          <span class="comment"># สร้างช่องจอดรถ</span>
+│   │   └── <span class="dir">payment/</span>
+│   │       ├── <span class="java">Payment.java</span>              <span class="comment"># Abstract Base Class</span>
+│   │       ├── <span class="java">PromptPayPayment.java</span>
+│   │       ├── <span class="java">CreditCardPayment.java</span>
+│   │       └── <span class="java">CashPayment.java</span>
+│   ├── <span class="dir">repository/</span>
+│   │   ├── <span class="java">TicketRepository.java</span>
+│   │   └── <span class="java">PaymentRepository.java</span>
+│   ├── <span class="dir">service/</span>
+│   │   └── <span class="java">ParkingService.java</span>          <span class="comment"># Facade / Application Service</span>
+│   ├── <span class="dir">server/</span>
+│   │   └── <span class="java">ParkingServer.java</span>           <span class="comment"># HTTP REST API + Static Server</span>
+│   ├── <span class="dir">test/</span>
+│   │   └── <span class="java">ParkingSystemTest.java</span>       <span class="comment"># Automated Unit Tests</span>
+│   └── <span class="dir">util/</span>
+│       └── <span class="java">SimpleJson.java</span>              <span class="comment"># Pure Java JSON Utility</span>
+├── <span class="dir">web/</span>
+│   ├── <span class="html">index.html</span>                       <span class="comment"># Modern Glassmorphic SPA</span>
+│   ├── <span class="html">system-overview.html</span>             <span class="comment"># เอกสารนี้</span>
+│   ├── <span class="dir">css/</span>
+│   │   └── <span class="css">style.css</span>                    <span class="comment"># Responsive Theme & Animations</span>
+│   └── <span class="dir">js/</span>
+│       └── <span class="js">app.js</span>                        <span class="comment"># REST Client & UI Controller</span>
+├── <span class="bat">run.bat</span>                              <span class="comment"># 1-Click: Compile + Test + Server</span>
+├── <span class="bat">test.bat</span>                             <span class="comment"># รัน Unit Tests เท่านั้น</span>
+└── <span class="md">README.md</span>                            <span class="comment"># เอกสารโปรเจกต์</span>
+</pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION: ขั้นตอนการทำงาน (Workflow) -->
+    <!-- ============================================================ -->
+    <section class="section" id="workflow">
+        <div class="section-header reveal">
+            <div class="section-label">🔄 Workflow</div>
+            <h2 class="section-title">ขั้นตอนการทำงานของระบบ</h2>
+            <p class="section-desc">ตั้งแต่รถเข้า → จอดรถ → ชำระเงิน → รถออก พร้อม AI ช่วยทุกขั้นตอน</p>
+        </div>
+
+        <!-- Visual Flow -->
+        <div class="flow-container reveal">
+            <div class="flow-step">
+                <div class="flow-step-icon">📷</div>
+                <div class="flow-step-label">1. สแกนป้ายทะเบียน</div>
+                <div class="flow-step-desc">AI ANPR อ่านป้ายอัตโนมัติ</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">
+                <div class="flow-step-icon">🤖</div>
+                <div class="flow-step-label">2. AI แนะนำช่องจอด</div>
+                <div class="flow-step-desc">XAI พร้อมคำอธิบาย</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">
+                <div class="flow-step-icon">🎫</div>
+                <div class="flow-step-label">3. ออกตั๋ว</div>
+                <div class="flow-step-desc">เปิดไม้กั้น ออกตั๋วบาร์โค้ด</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">
+                <div class="flow-step-icon">🅿️</div>
+                <div class="flow-step-label">4. จอดรถ</div>
+                <div class="flow-step-desc">อัปเดตสถานะเรียลไทม์</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">
+                <div class="flow-step-icon">💰</div>
+                <div class="flow-step-label">5. ชำระเงิน</div>
+                <div class="flow-step-desc">3 ช่องทาง + ใบเสร็จ</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">
+                <div class="flow-step-icon">🚪</div>
+                <div class="flow-step-label">6. รถออก</div>
+                <div class="flow-step-desc">ปลดปล่อยช่องจอด</div>
+            </div>
+        </div>
+
+        <!-- Detailed Timeline -->
+        <div style="margin-top: 56px;" class="reveal">
+            <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 24px;">📋 รายละเอียดทีละขั้นตอน</h3>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-step">ขั้นตอนที่ 1 — Entry Gate (จุดตรวจทางเข้า)</div>
+                    <div class="timeline-title">รถเข้าจอดและออกตั๋ว (Check-In)</div>
+                    <div class="timeline-desc">
+                        ผู้ใช้ป้อนเลขทะเบียน (หรือให้ AI ANPR สแกนอัตโนมัติ) ➜ เลือกประเภทยานพาหนะ ➜ ระบบใช้ <strong>VehicleFactory</strong> สร้าง Object รถ ➜ <strong>ParkingLot (Aggregate Root)</strong> จัดสรรช่องจอดด้วย <strong>SlotAllocationStrategy</strong> ➜ สร้าง <strong>Ticket</strong> (สถานะ ACTIVE) ➜ แสดงแอนิเมชันไม้กั้นเปิด ➜ AI แนะนำช่องจอดที่ดีที่สุดพร้อมคำอธิบาย (XAI)
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-step">ขั้นตอนที่ 2 — Lot Map (แผนผังจอดรถ)</div>
+                    <div class="timeline-title">มอนิเตอร์สถานะแบบเรียลไทม์</div>
+                    <div class="timeline-desc">
+                        หน้าจอแผนผัง 2D แสดงช่องจอดรถทั้ง 3 ชั้น แยกสีตามสถานะ: <span style="color:var(--accent-green);">🟢 ว่าง</span> / <span style="color:var(--accent-red);">🔴 มีรถจอด</span> / <span style="color:var(--accent-cyan);">🔵 EV Charging</span> ➜ คลิกที่ช่องจอดเพื่อดูข้อมูลรถ, เวลาเข้า, กลยุทธ์ราคา และค่าบริการสะสม ➜ <strong>Observer Pattern</strong> (DisplayBoard) คอยอัปเดตจำนวนที่ว่างแบบเรียลไทม์
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-step">ขั้นตอนที่ 3 — Time Travel (เร่งเวลา)</div>
+                    <div class="timeline-title">จำลองเวลาเพื่อทดสอบ</div>
+                    <div class="timeline-desc">
+                        ระบบ <strong>Clock Simulation</strong> ช่วยให้ทดสอบค่าจอดได้ทันที: ปุ่ม +15 นาที, +1 ชั่วโมง, +3 ชั่วโมง, +1 วัน ➜ ระบบคำนวณค่าจอดตาม PricingStrategy ที่สอดคล้องกับประเภทรถและระยะเวลาที่เปลี่ยนไป ➜ ทำให้ทดสอบกฎการคำนวณเงินทุกกรณีได้สะดวกรวดเร็ว
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-step">ขั้นตอนที่ 4 — Exit & Cashier (ชำระเงินและออก)</div>
+                    <div class="timeline-title">คำนวณค่าจอดและชำระเงิน</div>
+                    <div class="timeline-desc">
+                        ค้นหาตั๋วด้วยเลขตั๋วหรือป้ายทะเบียน ➜ ระบบคำนวณค่าจอดผ่าน <strong>PricingStrategy</strong> (Polymorphism) ➜ เลือกช่องทางชำระเงิน (PromptPay / บัตรเครดิต / เงินสด) ➜ <strong>Payment</strong> (Abstract Class) ➜ ตั๋วเปลี่ยนสถานะเป็น PAID ➜ ออกใบเสร็จ ➜ กดออก (EXIT) ➜ ช่องจอดถูกปลดปล่อย ➜ DisplayBoard อัปเดตจำนวนที่ว่าง
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-step">ขั้นตอนที่ 5 — กรณีพิเศษ</div>
+                    <div class="timeline-title">ตั๋วหาย (Lost Ticket)</div>
+                    <div class="timeline-desc">
+                        หากผู้ใช้ทำตั๋วหาย ➜ กดปุ่ม "ตั๋วหาย" ➜ ระบบคิดค่าปรับเหมาจ่าย <strong>300 บาท</strong> ➜ ตั๋วเปลี่ยนสถานะเป็น LOST ➜ ชำระเงินและนำรถออก ➜ ระบบบันทึกประวัติไว้ครบถ้วน
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION: ระบบ AI (AI Features) -->
+    <!-- ============================================================ -->
+    <section class="section" id="ai-features">
+        <div class="section-header reveal">
+            <div class="section-label">🤖 Artificial Intelligence</div>
+            <h2 class="section-title">ระบบปัญญาประดิษฐ์ (AI)</h2>
+            <p class="section-desc">AI 5 โมดูลที่ช่วยยกระดับประสบการณ์ผู้ใช้ พร้อมอธิบายเหตุผลทุกการตัดสินใจ (Explainable AI)</p>
+        </div>
+
+        <div class="ai-showcase reveal">
+            <div class="ai-badge">🧠 Powered by AIParkingService.java — 415 Lines of AI Logic</div>
+            <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 8px;">คำอธิบายการทำงานของ AI ในระบบ</h3>
+            <p style="font-size: 0.92rem; color: var(--text-secondary); margin-bottom: 24px;">
+                AI ทั้ง 5 โมดูลถูกออกแบบเป็น <strong>Rule-Based Expert System</strong> ที่ทำงานภายในตัว (On-Device) ไม่ต้องเชื่อมต่ออินเทอร์เน็ตหรือ Cloud API ภายนอก ทุกการตัดสินใจมี "คำอธิบาย" ประกอบตามหลัก <strong>Explainable AI (XAI)</strong> เพื่อให้ผู้ใช้เข้าใจว่า AI คิดอย่างไร
+            </p>
+
+            <ul class="ai-feature-list">
+                <li class="ai-feature-item">
+                    <div class="ai-feature-num">1</div>
+                    <div class="ai-feature-text">
+                        <h4>🎯 XAI Smart Slot Recommendation</h4>
+                        <p>
+                            แนะนำช่องจอดที่ดีที่สุดด้วย <strong>Multi-Criteria Optimization Algorithm</strong> คำนวณ 4 ปัจจัย: ความเข้ากันได้ของรถกับช่องจอด, การสงวนจุดชาร์จ EV, การกระจายความหนาแน่น (Load Balancing), และระยะทางเดิน ➜ แสดง "คะแนนความเหมาะสม" และ "ปัจจัยที่ AI พิจารณา" ทุกข้อ ➜ ความเชื่อมั่น 96%
+                        </p>
+                    </div>
+                </li>
+                <li class="ai-feature-item">
+                    <div class="ai-feature-num">2</div>
+                    <div class="ai-feature-text">
+                        <h4>📷 ANPR / LPR (อ่านป้ายทะเบียนอัตโนมัติ)</h4>
+                        <p>
+                            จำลองระบบ <strong>Automatic Number Plate Recognition</strong> (Computer Vision) สแกนป้ายทะเบียนจากกล้อง CCTV ➜ AI จำแนกประเภทยานพาหนะ (รถยนต์/EV/มอเตอร์ไซค์/รถบรรทุก) อัตโนมัติ ➜ ความแม่นยำ 98.4-99.9% ➜ แสดงผลตรวจจับ เช่น "2-Wheeled Chassis, Handlebars detected"
+                        </p>
+                    </div>
+                </li>
+                <li class="ai-feature-item">
+                    <div class="ai-feature-num">3</div>
+                    <div class="ai-feature-text">
+                        <h4>📊 Predictive Traffic & Dynamic Pricing</h4>
+                        <p>
+                            พยากรณ์ความหนาแน่นของลานจอด 24 ชั่วโมงล่วงหน้า ➜ วิเคราะห์ช่วงเร่งด่วน (Peak Hours: 07:00-09:00, 11:00-13:00) ➜ แนะนำ Dynamic Pricing Surge Multiplier (1.0x - 1.25x) ➜ ให้คำอธิบายเหตุผลเชิงพฤติกรรมผู้ใช้บริการ
+                        </p>
+                    </div>
+                </li>
+                <li class="ai-feature-item">
+                    <div class="ai-feature-num">4</div>
+                    <div class="ai-feature-text">
+                        <h4>💼 Executive Analytics & Insights</h4>
+                        <p>
+                            บทวิเคราะห์สำหรับผู้บริหาร: Efficiency Score (94.2%), ดัชนีคาร์บอนที่ประหยัดได้, อัตราหมุนเวียนเฉลี่ย (2.4 รอบ/ช่อง/วัน), รายได้คาดการณ์ ➜ วิเคราะห์แยกชั้น ➜ แนะนำ 4 ข้อเสนอ เช่น ขยายจุดชาร์จ EV, เปิดทางออก 2 ช่อง ฯลฯ
+                        </p>
+                    </div>
+                </li>
+                <li class="ai-feature-item">
+                    <div class="ai-feature-num">5</div>
+                    <div class="ai-feature-text">
+                        <h4>💬 AI Copilot Chatbot (Grounded)</h4>
+                        <p>
+                            แชตบอทอัจฉริยะที่ดึงข้อมูลจากฐานข้อมูลจริง (Grounded AI) ตอบได้ 6 หมวด: SLOT_AVAILABILITY, REVENUE_FINANCE, EV_CHARGING, PRICING_STRATEGY, OOP_ARCHITECTURE, GENERAL ➜ ตอบด้วยตัวเลขและสถานะสดจริง ไม่ใช่ข้อมูลสร้างขึ้น
+                        </p>
+                    </div>
+                </li>
+            </ul>
+        </div>
+
+        <!-- AI Explanation Box -->
+        <div class="highlight-box reveal" style="margin-top: 32px;">
+            <h4 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 12px; color: var(--accent-cyan);">🔍 ทำไมต้องมี Explainable AI (XAI)?</h4>
+            <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.7;">
+                ระบบ AI ในที่จอดรถนี้ไม่ใช่ "กล่องดำ" (Black Box) — ทุกการตัดสินใจจะมี <strong>คำอธิบายว่าทำไม AI ถึงแนะนำแบบนั้น</strong> เช่น "AI แนะนำช่อง F1-01 เพราะ (1) ตรงกับความต้องการชาร์จ EV (+35 คะแนน), (2) ชั้น 1 มีพื้นที่โล่ง (+10 คะแนน)" ➜ ช่วยให้ผู้ใช้เชื่อมั่นและเข้าใจ ➜ สอดคล้องกับหลักจริยธรรม AI สากล (Trustworthy AI)
+            </p>
+        </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION: อุปกรณ์ที่ทำงานร่วมกัน (Device Integration) -->
+    <!-- ============================================================ -->
+    <section class="section" id="devices">
+        <div class="section-header reveal">
+            <div class="section-label">📱 Hardware & Devices</div>
+            <h2 class="section-title">อุปกรณ์ที่ทำงานร่วมกันได้</h2>
+            <p class="section-desc">ระบบออกแบบให้สามารถเชื่อมต่อและทำงานร่วมกับอุปกรณ์ Hardware ในลานจอดรถได้หลากหลาย</p>
+        </div>
+
+        <div class="grid-2 reveal">
+            <!-- CCTV -->
+            <div class="device-card">
+                <div class="device-icon" style="background: rgba(239,68,68,0.12);">📹</div>
+                <div class="device-info">
+                    <h4>กล้อง CCTV / IP Camera (ANPR)</h4>
+                    <p>กล้องวงจรปิดความละเอียดสูง 4K ติดตั้งที่ทางเข้า-ออก สำหรับระบบ <strong>AI ANPR (Automatic Number Plate Recognition)</strong> อ่านป้ายทะเบียนรถอัตโนมัติ และจำแนกประเภทยานพาหนะ (Car/EV/Motorcycle/Truck)</p>
+                    <span class="device-tag" style="background: rgba(239,68,68,0.1); color: var(--accent-red);">AI Computer Vision</span>
+                </div>
+            </div>
+
+            <!-- Barrier Gate -->
+            <div class="device-card">
+                <div class="device-icon" style="background: rgba(245,158,11,0.12);">🚧</div>
+                <div class="device-info">
+                    <h4>ไม้กั้นอัตโนมัติ (Barrier Gate)</h4>
+                    <p>ระบบไม้กั้นอัตโนมัติที่ทางเข้าและทางออก เชื่อมกับ Server ➜ เปิด-ปิดตาม Check-in/Check-out ผ่าน API ➜ มีแอนิเมชันจำลองบนหน้าเว็บ</p>
+                    <span class="device-tag" style="background: rgba(245,158,11,0.1); color: var(--accent-orange);">Automated Control</span>
+                </div>
+            </div>
+
+            <!-- Display Board -->
+            <div class="device-card">
+                <div class="device-icon" style="background: rgba(59,130,246,0.12);">📺</div>
+                <div class="device-info">
+                    <h4>ป้ายไฟ LED แสดงที่ว่าง (Display Board)</h4>
+                    <p>ป้ายอิเล็กทรอนิกส์หน้าทางเข้าแสดงจำนวนช่องจอดว่างแบบเรียลไทม์ ➜ ใช้ <strong>Observer Pattern</strong> (DisplayBoard implements ParkingLotObserver) ➜ อัปเดตอัตโนมัติทุกครั้งที่มีรถเข้า-ออก</p>
+                    <span class="device-tag" style="background: rgba(59,130,246,0.1); color: var(--accent-blue);">Observer Pattern</span>
+                </div>
+            </div>
+
+            <!-- EV Charger -->
+            <div class="device-card">
+                <div class="device-icon" style="background: rgba(16,185,129,0.12);">⚡</div>
+                <div class="device-info">
+                    <h4>แท่นชาร์จรถยนต์ไฟฟ้า (EV Charger)</h4>
+                    <p>สถานีชาร์จรถยนต์ไฟฟ้า 22kW ติดตั้งที่ชั้น 1 (ช่อง F1-01 ถึง F1-03) ➜ ระบบ AI จัดสรรให้เฉพาะรถ EV ที่เลือก "ต้องการชาร์จ" เพื่อสงวนหัวชาร์จให้คันที่จำเป็น</p>
+                    <span class="device-tag" style="background: rgba(16,185,129,0.1); color: var(--accent-green);">Smart EV Management</span>
+                </div>
+            </div>
+
+            <!-- Ticket Printer -->
+            <div class="device-card">
+                <div class="device-icon" style="background: rgba(139,92,246,0.12);">🖨️</div>
+                <div class="device-info">
+                    <h4>เครื่องพิมพ์ตั๋ว (Ticket Printer)</h4>
+                    <p>เครื่องพิมพ์ตั๋วความร้อน (Thermal Printer) ออกตั๋วจอดรถพร้อมบาร์โค้ด ➜ แสดงเลขตั๋ว, ทะเบียนรถ, เวลาเข้า, ช่องจอดที่ได้รับ ➜ ใช้สำหรับสแกนตอนออกจากลานจอด</p>
+                    <span class="device-tag" style="background: rgba(139,92,246,0.1); color: var(--accent-purple);">Barcode System</span>
+                </div>
+            </div>
+
+            <!-- Payment Terminal -->
+            <div class="device-card">
+                <div class="device-icon" style="background: rgba(236,72,153,0.12);">💳</div>
+                <div class="device-info">
+                    <h4>เครื่องรับชำระเงิน (Payment Terminal)</h4>
+                    <p>รองรับ 3 ช่องทาง: (1) <strong>PromptPay QR Code</strong> สแกนจ่ายง่าย (2) <strong>เครื่องรูดบัตรเครดิต/เดบิต</strong> ป้อน 4 หลักสุดท้าย (3) <strong>เครื่องรับเงินสด</strong> คำนวณเงินทอนอัตโนมัติ</p>
+                    <span class="device-tag" style="background: rgba(236,72,153,0.1); color: var(--accent-pink);">Multi-Channel Payment</span>
+                </div>
+            </div>
+
+            <!-- Sensor -->
+            <div class="device-card">
+                <div class="device-icon" style="background: rgba(6,182,212,0.12);">📡</div>
+                <div class="device-info">
+                    <h4>เซ็นเซอร์ตรวจจับรถ (Parking Sensor)</h4>
+                    <p>เซ็นเซอร์อินฟราเรด/อัลตราโซนิก ฝังที่ช่องจอดแต่ละช่อง ➜ ตรวจจับสถานะช่องจอด (AVAILABLE / OCCUPIED) ➜ ส่งข้อมูลกลับ Server ผ่าน IoT Gateway ➜ อัปเดตแผนผังบนหน้าเว็บ</p>
+                    <span class="device-tag" style="background: rgba(6,182,212,0.1); color: var(--accent-cyan);">IoT Sensor</span>
+                </div>
+            </div>
+
+            <!-- Server -->
+            <div class="device-card">
+                <div class="device-icon" style="background: rgba(245,158,11,0.12);">🖥️</div>
+                <div class="device-info">
+                    <h4>เซิร์ฟเวอร์ควบคุมกลาง (Central Server)</h4>
+                    <p>คอมพิวเตอร์เซิร์ฟเวอร์รัน Java SE 26 ➜ ทำหน้าที่ประมวลผล Business Logic, AI, REST API ➜ เชื่อมต่อกับอุปกรณ์ทั้งหมดผ่าน Network ➜ ให้บริการ Web Frontend ผ่านพอร์ต 8080</p>
+                    <span class="device-tag" style="background: rgba(245,158,11,0.1); color: var(--accent-orange);">Java SE HttpServer</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Device Integration Diagram -->
+        <div class="highlight-box reveal" style="margin-top: 32px;">
+            <h4 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 16px;">🔗 แผนภาพการเชื่อมต่ออุปกรณ์</h4>
+            <div style="text-align: center; font-size: 0.92rem; color: var(--text-secondary); line-height: 2.4;">
+                <div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px;">
+                    <span style="padding: 8px 16px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); border-radius: 8px;">📹 CCTV (ANPR)</span>
+                    <span style="padding: 8px 16px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); border-radius: 8px;">🚧 Barrier Gate</span>
+                    <span style="padding: 8px 16px; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); border-radius: 8px;">⚡ EV Charger</span>
+                    <span style="padding: 8px 16px; background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.2); border-radius: 8px;">📡 Sensor</span>
+                </div>
+                <div style="font-size: 1.5rem; margin: 8px 0;">⬇ ⬆</div>
+                <div style="padding: 16px 32px; background: rgba(59,130,246,0.1); border: 2px solid rgba(59,130,246,0.3); border-radius: 12px; display: inline-block; font-weight: 700; color: var(--accent-blue);">
+                    🖥️ Central Server (Java SE + AI Engine + REST API)
+                </div>
+                <div style="font-size: 1.5rem; margin: 8px 0;">⬇ ⬆</div>
+                <div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px;">
+                    <span style="padding: 8px 16px; background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.2); border-radius: 8px;">🖨️ Ticket Printer</span>
+                    <span style="padding: 8px 16px; background: rgba(236,72,153,0.1); border: 1px solid rgba(236,72,153,0.2); border-radius: 8px;">💳 Payment Terminal</span>
+                    <span style="padding: 8px 16px; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); border-radius: 8px;">📺 Display Board</span>
+                    <span style="padding: 8px 16px; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); border-radius: 8px;">🌐 Web Browser</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION: OOP & Design Patterns -->
+    <!-- ============================================================ -->
+    <section class="section" id="oop">
+        <div class="section-header reveal">
+            <div class="section-label">🏛️ OOP & Design Patterns</div>
+            <h2 class="section-title">หลักการ OOP และ Design Patterns</h2>
+            <p class="section-desc">ระบบนี้ออกแบบตามหลัก OOP 4 เสาหลัก และประยุกต์ใช้ 4 Design Patterns</p>
+        </div>
+
+        <!-- 4 OOP Pillars -->
+        <div class="grid-2 reveal">
+            <div class="card oop-pillar abstraction">
+                <div class="card-title" style="color: var(--accent-blue);">1. Abstraction (นามธรรม)</div>
+                <div class="card-desc">
+                    <strong>Vehicle</strong> — คลาสแม่นามธรรมสำหรับยานพาหนะ ซ่อนรายละเอียดภายในและบังคับเมธอด <code>canParkIn(Slot)</code>, <code>getPricingStrategy()</code><br><br>
+                    <strong>Payment</strong> — คลาสแม่นามธรรมสำหรับการชำระเงิน บังคับ <code>processPayment()</code><br><br>
+                    <strong>PricingStrategy</strong> & <strong>SlotAllocationStrategy</strong> — อินเตอร์เฟสกำหนดสัญญาการคิดราคาและจัดสรรช่องจอด
+                </div>
+            </div>
+            <div class="card oop-pillar encapsulation">
+                <div class="card-title" style="color: var(--accent-purple);">2. Encapsulation (การห่อหุ้ม)</div>
+                <div class="card-desc">
+                    <strong>Slot</strong> — ปกป้อง Invariants: ห้ามรับรถใหม่เมื่อสถานะเป็น OCCUPIED, จัดการจอง/ปลดปล่อยผ่าน <code>assignVehicle()</code> และ <code>release()</code> แบบ Thread-Safe<br><br>
+                    <strong>Ticket</strong> — ควบคุม State Transition (ACTIVE → PAID → EXITED หรือ LOST) ห้ามแก้ไขค่าธรรมเนียมจากภายนอก
+                </div>
+            </div>
+            <div class="card oop-pillar inheritance">
+                <div class="card-title" style="color: var(--accent-green);">3. Inheritance (การสืบทอด)</div>
+                <div class="card-desc">
+                    <strong>Vehicle</strong> ➔ Car, Motorcycle, ElectricVehicle, Truck<br>
+                    ➜ คลาสลูกแต่ละประเภทสืบทอดคุณสมบัติและปรับพฤติกรรมเฉพาะตน<br><br>
+                    <strong>Payment</strong> ➔ PromptPayPayment, CreditCardPayment, CashPayment<br>
+                    ➜ แต่ละช่องทางชำระเงินมีตรรกะการประมวลผลเฉพาะของตนเอง
+                </div>
+            </div>
+            <div class="card oop-pillar polymorphism">
+                <div class="card-title" style="color: var(--accent-pink);">4. Polymorphism (พหุสัณฐาน)</div>
+                <div class="card-desc">
+                    <strong>Double Dispatch</strong>: <code>slot.canFitVehicle(vehicle)</code> ส่งต่อให้ <code>vehicle.canParkIn(this)</code> ➜ รถแต่ละชนิดตัดสินเองว่าจอดในช่องนี้ได้หรือไม่<br><br>
+                    <strong>Strategy Polymorphism</strong>: <code>PricingStrategy.calculateFee()</code> ➜ ผลลัพธ์แปรผันตามประเภทรถและระยะเวลาจริง โดยไม่ต้อง if-else
+                </div>
+            </div>
+        </div>
+
+        <!-- Design Patterns -->
+        <div style="margin-top: 48px;" class="reveal">
+            <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 24px; text-align: center;">🧩 Design Patterns ที่ใช้ในระบบ</h3>
+            <div class="grid-2">
+                <div class="pattern-card">
+                    <div class="pattern-name"><span class="pattern-emoji">🎯</span> Strategy Pattern</div>
+                    <div class="pattern-desc">แยกตรรกะการคิดเงินออกจากคลาสหลัก เพิ่ม/ปรับกลยุทธ์ราคาใหม่ได้โดยไม่แก้โค้ดเดิม (Open-Closed Principle)</div>
+                    <div class="pattern-files">
+                        <span class="pattern-file">PricingStrategy.java</span>
+                        <span class="pattern-file">StandardPricingStrategy.java</span>
+                        <span class="pattern-file">EVPricingStrategy.java</span>
+                        <span class="pattern-file">MotorcyclePricingStrategy.java</span>
+                        <span class="pattern-file">TruckPricingStrategy.java</span>
+                    </div>
+                </div>
+                <div class="pattern-card">
+                    <div class="pattern-name"><span class="pattern-emoji">👁️</span> Observer Pattern</div>
+                    <div class="pattern-desc">ParkingLot เป็น Subject ส่งการแจ้งเตือนเมื่อรถเข้า-ออก ➜ DisplayBoard (Observer) อัปเดตจำนวนที่ว่างแบบเรียลไทม์</div>
+                    <div class="pattern-files">
+                        <span class="pattern-file">ParkingLotObserver.java</span>
+                        <span class="pattern-file">DisplayBoard.java</span>
+                        <span class="pattern-file">ParkingLot.java</span>
+                    </div>
+                </div>
+                <div class="pattern-card">
+                    <div class="pattern-name"><span class="pattern-emoji">🏭</span> Factory Pattern</div>
+                    <div class="pattern-desc">ใช้ Factory สร้าง Object รถและช่องจอดตามประเภท แยกตรรกะการสร้างออกจากการใช้งาน</div>
+                    <div class="pattern-files">
+                        <span class="pattern-file">VehicleFactory.java</span>
+                        <span class="pattern-file">SlotFactory.java</span>
+                    </div>
+                </div>
+                <div class="pattern-card">
+                    <div class="pattern-name"><span class="pattern-emoji">🎭</span> Facade / Aggregate Root</div>
+                    <div class="pattern-desc">ParkingLot เป็น Aggregate Root ควบคุม Floor & Slot, ParkingService เป็น Facade เชื่อมทุก Domain</div>
+                    <div class="pattern-files">
+                        <span class="pattern-file">ParkingLot.java</span>
+                        <span class="pattern-file">ParkingService.java</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION: API Endpoints -->
+    <!-- ============================================================ -->
+    <section class="section" id="api">
+        <div class="section-header reveal">
+            <div class="section-label">🔌 REST API</div>
+            <h2 class="section-title">API Endpoints</h2>
+            <p class="section-desc">RESTful API ทั้ง 15 เส้นทาง ให้บริการผ่าน Pure Java SE HttpServer บนพอร์ต 8080</p>
+        </div>
+
+        <div class="api-table-wrap reveal">
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>Endpoint</th>
+                        <th>คำอธิบาย</th>
+                        <th>หมวด</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td class="api-path">/api/status</td>
+                        <td>ข้อมูลสถานะภาพรวมของลานจอดรถ (จำนวนว่าง/จอดอยู่)</td>
+                        <td>Core</td>
+                    </tr>
+                    <tr>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td class="api-path">/api/lot</td>
+                        <td>ข้อมูลผังลานจอดรถ แยกชั้น แยกช่อง พร้อมสถานะ</td>
+                        <td>Core</td>
+                    </tr>
+                    <tr>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td class="api-path">/api/park</td>
+                        <td>นำรถเข้าจอด (Check-in) ส่ง vehicleType, licensePlate</td>
+                        <td>Core</td>
+                    </tr>
+                    <tr>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td class="api-path">/api/calculate-fee</td>
+                        <td>คำนวณค่าบริการจอดรถ (ก่อนชำระจริง)</td>
+                        <td>Core</td>
+                    </tr>
+                    <tr>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td class="api-path">/api/pay</td>
+                        <td>ชำระเงินค่าบริการจอดรถ (PromptPay/Credit/Cash)</td>
+                        <td>Payment</td>
+                    </tr>
+                    <tr>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td class="api-path">/api/exit</td>
+                        <td>นำรถออก (Check-out) ปลดปล่อยช่องจอด</td>
+                        <td>Core</td>
+                    </tr>
+                    <tr>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td class="api-path">/api/lost-ticket</td>
+                        <td>แจ้งตั๋วหาย — คิดค่าปรับ 300 บาท</td>
+                        <td>Core</td>
+                    </tr>
+                    <tr>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td class="api-path">/api/time-travel</td>
+                        <td>จำลองเลื่อนเวลา (+15m, +1h, +3h, +1d, reset)</td>
+                        <td>Simulation</td>
+                    </tr>
+                    <tr>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td class="api-path">/api/tickets</td>
+                        <td>รายการตั๋วทั้งหมดในระบบ</td>
+                        <td>History</td>
+                    </tr>
+                    <tr>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td class="api-path">/api/payments</td>
+                        <td>รายการประวัติการชำระเงินทั้งหมด</td>
+                        <td>History</td>
+                    </tr>
+                    <tr style="background: rgba(6,182,212,0.03);">
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td class="api-path">/api/ai/recommend</td>
+                        <td>AI แนะนำช่องจอดที่ดีที่สุดพร้อมคำอธิบาย (XAI)</td>
+                        <td style="color: var(--accent-cyan);">🤖 AI</td>
+                    </tr>
+                    <tr style="background: rgba(6,182,212,0.03);">
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td class="api-path">/api/ai/anpr</td>
+                        <td>สแกนป้ายทะเบียนและจำแนกประเภทรถ (ANPR)</td>
+                        <td style="color: var(--accent-cyan);">🤖 AI</td>
+                    </tr>
+                    <tr style="background: rgba(6,182,212,0.03);">
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td class="api-path">/api/ai/predict</td>
+                        <td>พยากรณ์ความหนาแน่น + Dynamic Pricing Advisory</td>
+                        <td style="color: var(--accent-cyan);">🤖 AI</td>
+                    </tr>
+                    <tr style="background: rgba(6,182,212,0.03);">
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td class="api-path">/api/ai/insights</td>
+                        <td>บทวิเคราะห์สำหรับผู้บริหาร (Executive Analytics)</td>
+                        <td style="color: var(--accent-cyan);">🤖 AI</td>
+                    </tr>
+                    <tr style="background: rgba(6,182,212,0.03);">
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td class="api-path">/api/ai/chat</td>
+                        <td>AI Copilot แชตบอทอัจฉริยะ (Grounded AI)</td>
+                        <td style="color: var(--accent-cyan);">🤖 AI</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION: อัตราค่าบริการ (Pricing) -->
+    <!-- ============================================================ -->
+    <section class="section" id="pricing">
+        <div class="section-header reveal">
+            <div class="section-label">💰 Pricing Strategy</div>
+            <h2 class="section-title">อัตราค่าบริการจอดรถ</h2>
+            <p class="section-desc">คิดค่าบริการอัตโนมัติตาม PricingStrategy ของแต่ละประเภทยานพาหนะ (Strategy Pattern)</p>
+        </div>
+
+        <div class="pricing-grid reveal">
+            <div class="pricing-card">
+                <div class="pricing-card-icon">🚗</div>
+                <div class="pricing-card-name">รถยนต์ทั่วไป</div>
+                <div class="pricing-card-strategy">StandardPricingStrategy</div>
+                <div class="pricing-card-rate">20-30</div>
+                <div class="pricing-card-unit">บาท/ชั่วโมง</div>
+                <div class="pricing-card-free">🆓 ฟรี 15 นาทีแรก</div>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 12px;">ชม.แรก 20฿ → ชม.ถัดไป 30฿/ชม.</p>
+            </div>
+            <div class="pricing-card">
+                <div class="pricing-card-icon">🏍️</div>
+                <div class="pricing-card-name">มอเตอร์ไซค์</div>
+                <div class="pricing-card-strategy">MotorcyclePricingStrategy</div>
+                <div class="pricing-card-rate">10</div>
+                <div class="pricing-card-unit">บาท/ชั่วโมง</div>
+                <div class="pricing-card-free">🆓 ฟรี 30 นาทีแรก</div>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 12px;">อัตราเดียวตลอด 10฿/ชม.</p>
+            </div>
+            <div class="pricing-card">
+                <div class="pricing-card-icon">🔌</div>
+                <div class="pricing-card-name">รถยนต์ไฟฟ้า (EV)</div>
+                <div class="pricing-card-strategy">EVPricingStrategy</div>
+                <div class="pricing-card-rate">40</div>
+                <div class="pricing-card-unit">บาท/ชั่วโมง</div>
+                <div class="pricing-card-free">⚡ รวมค่าชาร์จแล้ว</div>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 12px;">ชาร์จ 22kW รวมค่าไฟในราคา</p>
+            </div>
+            <div class="pricing-card">
+                <div class="pricing-card-icon">🚛</div>
+                <div class="pricing-card-name">รถบรรทุก</div>
+                <div class="pricing-card-strategy">TruckPricingStrategy</div>
+                <div class="pricing-card-rate">50</div>
+                <div class="pricing-card-unit">บาท/ชั่วโมง</div>
+                <div class="pricing-card-free">🅿️ ช่องจอดขนาดพิเศษ</div>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 12px;">ช่อง LARGE พร้อมเพดานสูง</p>
+            </div>
+        </div>
+
+        <div class="highlight-box warning reveal" style="margin-top: 32px; text-align: center;">
+            <h4 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; color: var(--accent-orange);">⚠️ กรณีตั๋วหาย (Lost Ticket)</h4>
+            <p style="font-size: 1.5rem; font-weight: 800; color: var(--accent-red); margin: 8px 0;">ค่าปรับเหมาจ่าย 300 บาท</p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary);">ตั๋วจอดรถสูญหาย คิดค่าปรับแบบเหมาจ่ายสำหรับทุกประเภทยานพาหนะ</p>
+        </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION: Parking Lot Layout -->
+    <!-- ============================================================ -->
+    <section class="section" id="lot-layout">
+        <div class="section-header reveal">
+            <div class="section-label">🏢 Parking Lot</div>
+            <h2 class="section-title">ผังลานจอดรถ 3 ชั้น</h2>
+            <p class="section-desc">อาคารจอดรถ 3 ชั้น ความจุรวมกว่า 20 ช่อง แยกโซนตามประเภทยานพาหนะ</p>
+        </div>
+
+        <div class="grid-3 reveal">
+            <div class="card" style="border-top: 3px solid var(--accent-blue);">
+                <div class="card-title" style="color: var(--accent-blue);">🏢 ชั้น 1 — VIP & EV Zone</div>
+                <div class="card-desc">
+                    <strong>ช่อง F1-01 ถึง F1-03</strong>: EV Charging (จุดชาร์จรถยนต์ไฟฟ้า 22kW)<br>
+                    <strong>ช่อง F1-04 ถึง F1-06</strong>: Standard (รถยนต์ทั่วไป)<br><br>
+                    ✅ ใกล้ทางเข้า-ออกมากที่สุด<br>
+                    ✅ AI จัดสรรชั้นนี้ให้ EV + รถยนต์เป็นหลัก<br>
+                    ✅ มีลิฟต์โดยสารและทางเดินหลัก
+                </div>
+            </div>
+            <div class="card" style="border-top: 3px solid var(--accent-purple);">
+                <div class="card-title" style="color: var(--accent-purple);">🏢 ชั้น 2 — Standard & Compact</div>
+                <div class="card-desc">
+                    <strong>ช่อง F2-01 ถึง F2-04</strong>: Standard (รถยนต์ขนาดทั่วไป)<br>
+                    <strong>ช่อง F2-05 ถึง F2-08</strong>: Compact (รถขนาดกะทัดรัด)<br><br>
+                    ✅ ช่องจอดมากที่สุดในอาคาร<br>
+                    ✅ AI จัดสรรรถขนาดเล็กลง Compact เพื่อสงวน Standard ให้คันใหญ่<br>
+                    ✅ พื้นที่โล่ง ถอยจอดสะดวก
+                </div>
+            </div>
+            <div class="card" style="border-top: 3px solid var(--accent-green);">
+                <div class="card-title" style="color: var(--accent-green);">🏢 ชั้น 3 — Motorcycle & Large</div>
+                <div class="card-desc">
+                    <strong>ช่อง F3-01 ถึง F3-04</strong>: Motorcycle (มอเตอร์ไซค์)<br>
+                    <strong>ช่อง F3-05 ถึง F3-06</strong>: Large (รถบรรทุก/รถใหญ่)<br><br>
+                    ✅ แยกโซนมอเตอร์ไซค์เพื่อความปลอดภัย<br>
+                    ✅ ช่อง LARGE เพดานสูง รองรับวงเลี้ยวรถบรรทุก<br>
+                    ✅ ทางออกเฉพาะสำหรับรถขนาดใหญ่
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION: เทคโนโลยี (Tech Stack) -->
+    <!-- ============================================================ -->
+    <section class="section" id="tech-stack">
+        <div class="section-header reveal">
+            <div class="section-label">⚡ Technology Stack</div>
+            <h2 class="section-title">เทคโนโลยีที่ใช้</h2>
+            <p class="section-desc">ระบบพัฒนาด้วย Pure Java SE ไม่ต้องติดตั้ง Framework เพิ่มเติม</p>
+        </div>
+
+        <div class="grid-3 reveal">
+            <div class="tech-item">
+                <div class="tech-icon" style="background: rgba(245,158,11,0.12); color: var(--accent-orange);">☕</div>
+                <div>
+                    <div class="tech-name">Java SE 26</div>
+                    <div class="tech-desc">ภาษาหลัก — OOP, Generics, Streams, java.time</div>
+                </div>
+            </div>
+            <div class="tech-item">
+                <div class="tech-icon" style="background: rgba(59,130,246,0.12); color: var(--accent-blue);">🌐</div>
+                <div>
+                    <div class="tech-name">com.sun.net.httpserver</div>
+                    <div class="tech-desc">Built-in HTTP Server — ไม่ง้อ Spring/Tomcat</div>
+                </div>
+            </div>
+            <div class="tech-item">
+                <div class="tech-icon" style="background: rgba(236,72,153,0.12); color: var(--accent-pink);">📄</div>
+                <div>
+                    <div class="tech-name">HTML5 + CSS3</div>
+                    <div class="tech-desc">Modern SPA, Glassmorphism, Responsive Design</div>
+                </div>
+            </div>
+            <div class="tech-item">
+                <div class="tech-icon" style="background: rgba(16,185,129,0.12); color: var(--accent-green);">⚡</div>
+                <div>
+                    <div class="tech-name">Vanilla JavaScript</div>
+                    <div class="tech-desc">REST Client, DOM Manipulation, Animations</div>
+                </div>
+            </div>
+            <div class="tech-item">
+                <div class="tech-icon" style="background: rgba(139,92,246,0.12); color: var(--accent-purple);">🧠</div>
+                <div>
+                    <div class="tech-name">Rule-Based AI Engine</div>
+                    <div class="tech-desc">On-device AI — ไม่ต้องใช้ Cloud API</div>
+                </div>
+            </div>
+            <div class="tech-item">
+                <div class="tech-icon" style="background: rgba(6,182,212,0.12); color: var(--accent-cyan);">📦</div>
+                <div>
+                    <div class="tech-name">In-Memory Repository</div>
+                    <div class="tech-desc">ConcurrentHashMap — Thread-Safe Storage</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- How to Run -->
+        <div class="highlight-box reveal" style="margin-top: 40px;">
+            <h4 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 16px;">🚀 วิธีรันระบบ (1-Click)</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                <div>
+                    <p style="font-size: 0.92rem; font-weight: 600; margin-bottom: 8px; color: var(--accent-green);">วิธีที่ 1: ดับเบิลคลิกไฟล์ Batch</p>
+                    <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;">
+                        ดับเบิลคลิกที่ <span style="color: var(--accent-green);">run.bat</span><br>
+                        → คอมไพล์ → Unit Tests → Start Server → เปิด Browser
+                    </div>
+                </div>
+                <div>
+                    <p style="font-size: 0.92rem; font-weight: 600; margin-bottom: 8px; color: var(--accent-blue);">วิธีที่ 2: Terminal / PowerShell</p>
+                    <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; line-height: 1.8;">
+                        <span style="color: var(--text-muted);"># คอมไพล์</span><br>
+                        <span style="color: var(--accent-cyan);">javac</span> -encoding UTF-8 -d bin src/**/*.java<br>
+                        <span style="color: var(--text-muted);"># รัน Server</span><br>
+                        <span style="color: var(--accent-cyan);">java</span> -cp bin server.ParkingServer<br>
+                        <span style="color: var(--text-muted);"># เปิด http://localhost:8080</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION: สรุปรวม (Summary) -->
+    <!-- ============================================================ -->
+    <section class="section" id="summary">
+        <div class="section-header reveal">
+            <div class="section-label">📝 Summary</div>
+            <h2 class="section-title">สรุปการทำงานของระบบ</h2>
+        </div>
+
+        <div class="card reveal" style="max-width: 900px; margin: 0 auto;">
+            <h3 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 20px; text-align: center;">🏆 Smart Parking Management System — สรุปภาพรวม</h3>
+
+            <div style="font-size: 0.92rem; color: var(--text-secondary); line-height: 1.9;">
+                <p><strong style="color: var(--text-primary);">ชื่อระบบ:</strong> Smart Parking Management System (OOP-Driven Full Stack Web Application)</p>
+                <p><strong style="color: var(--text-primary);">วัตถุประสงค์:</strong> ระบบบริหารจัดการลานจอดรถอัจฉริยะ ครอบคลุมตั้งแต่ทางเข้า (Entry Gate), ระบบจัดสรรช่องจอด (Slot Allocation), การชำระเงินหลายช่องทาง (Multi-Channel Payment), ไปจนถึงระบบ AI แนะนำและพยากรณ์</p>
+
+                <hr style="border: none; border-top: 1px solid var(--border-glass); margin: 20px 0;">
+
+                <p><strong style="color: var(--accent-blue);">🏗️ สถาปัตยกรรม:</strong> Layered Architecture 6 ชั้น (Frontend → Server → Service → AI → Domain → Repository)</p>
+                <p><strong style="color: var(--accent-purple);">🏛️ หลักการ OOP:</strong> Abstraction, Encapsulation, Inheritance, Polymorphism</p>
+                <p><strong style="color: var(--accent-green);">🧩 Design Patterns:</strong> Strategy, Observer, Factory, Facade / Aggregate Root</p>
+                <p><strong style="color: var(--accent-cyan);">🤖 AI Features:</strong> XAI Slot Recommendation, ANPR, Traffic Prediction, Executive Insights, Copilot Chatbot</p>
+
+                <hr style="border: none; border-top: 1px solid var(--border-glass); margin: 20px 0;">
+
+                <p><strong style="color: var(--accent-pink);">📱 อุปกรณ์ที่ทำงานร่วมกัน:</strong> กล้อง CCTV (ANPR), ไม้กั้นอัตโนมัติ, ป้ายไฟ LED, แท่นชาร์จ EV, เครื่องพิมพ์ตั๋ว, เครื่องรับชำระเงิน, เซ็นเซอร์ IoT, เซิร์ฟเวอร์ควบคุมกลาง</p>
+                <p><strong style="color: var(--accent-orange);">💰 การชำระเงิน:</strong> PromptPay QR Code, บัตรเครดิต/เดบิต, เงินสด (คำนวณเงินทอนอัตโนมัติ)</p>
+                <p><strong style="color: var(--accent-red);">🚗 ยานพาหนะ:</strong> รถยนต์ (Standard/Compact), มอเตอร์ไซค์, รถยนต์ไฟฟ้า (EV), รถบรรทุก (Truck)</p>
+
+                <hr style="border: none; border-top: 1px solid var(--border-glass); margin: 20px 0;">
+
+                <p><strong style="color: var(--text-primary);">⚡ เทคโนโลยี:</strong> Pure Java SE 26 + HTML5/CSS3/JavaScript — ไม่ใช้ Framework ภายนอก</p>
+                <p><strong style="color: var(--text-primary);">🔌 API:</strong> 15 REST API Endpoints (10 Core + 5 AI)</p>
+                <p><strong style="color: var(--text-primary);">🧪 Testing:</strong> Automated Unit Tests ผ่าน ParkingSystemTest.java</p>
+                <p><strong style="color: var(--text-primary);">📦 Deployment:</strong> 1-Click ผ่าน run.bat → Compile + Test + Start Server + Open Browser</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p class="footer-text">
+            📖 System Documentation — Smart Parking Management System v2.0
+        </p>
+        <p class="footer-text" style="margin-top: 8px;">
+            สร้างด้วย ❤️ สำหรับการเรียนรู้ OOP, Design Patterns, และ AI Integration
+        </p>
+        <div class="footer-links">
+            <a href="index.html">🏠 กลับสู่ระบบหลัก</a>
+            <a href="#overview">⬆ กลับขึ้นบน</a>
+            <a href="#ai-features">🤖 AI Features</a>
+            <a href="#devices">📱 อุปกรณ์</a>
+            <a href="#api">🔌 API Reference</a>
+        </div>
+    </footer>
+
+    <!-- JavaScript: Scroll Animations & Navigation -->
+    <script>
+        // ========== Scroll Reveal Animation ==========
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const revealObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.reveal').forEach(el => {
+            revealObserver.observe(el);
+        });
+
+        // ========== Navbar Scroll Effect ==========
+        const navbar = document.getElementById('navbar');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+
+        // ========== Active Nav Link Highlight ==========
+        const sections = document.querySelectorAll('section[id]');
+        const navLinks = document.querySelectorAll('.nav-links a');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - 100;
+                if (window.scrollY >= sectionTop) {
+                    current = section.getAttribute('id');
+                }
+            });
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // ========== Smooth Scroll for Anchor Links ==========
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        console.log('📖 System Overview Documentation loaded successfully!');
+    </script>
+</body>
+</html>
