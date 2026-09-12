@@ -31,6 +31,7 @@ jobs:
         run: |
           node --check web/js/app.js
           node --check web/js/demo-runtime.js
+          node --check web/js/logout-ui.js
 
       - name: Prepare presentation build
         run: |
@@ -44,15 +45,18 @@ jobs:
           marker = '    <!-- Floating AI Copilot Launcher Button -->'
           if marker in text:
               before = text.split(marker, 1)[0]
-              # The source currently closes the inner modal but misses the overlay close.
               if not before.rstrip().endswith('</div>\n    </div>'):
                   text = text.replace(marker, '    </div>\n\n' + marker, 1)
 
-          # Load the dedicated GitHub Pages runtime after the normal application controller.
+          # Load GitHub Pages runtime and the visible logout/session controls.
           app_script = '    <script src="js/app.js"></script>'
           runtime_script = '    <script src="js/demo-runtime.js"></script>'
+          logout_script = '    <script src="js/logout-ui.js"></script>'
           if runtime_script not in text:
               text = text.replace(app_script, app_script + '\n' + runtime_script, 1)
+          if logout_script not in text:
+              anchor = runtime_script if runtime_script in text else app_script
+              text = text.replace(anchor, anchor + '\n' + logout_script, 1)
 
           index.write_text(text, encoding='utf-8')
           PY
@@ -63,7 +67,9 @@ jobs:
           test -f web/login.html
           test -f web/js/app.js
           test -f web/js/demo-runtime.js
+          test -f web/js/logout-ui.js
           grep -q 'js/demo-runtime.js' web/index.html
+          grep -q 'js/logout-ui.js' web/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
