@@ -39,7 +39,7 @@ async function initializeSession() {
         updateCurrentUserBadge(data);
         return true;
     } catch (err) {
-        window.location.href = '/login.html';
+        window.location.href = 'login.html';
         return false;
     }
 }
@@ -59,7 +59,7 @@ async function logout() {
     } catch (err) {
         console.warn('Logout request failed:', err);
     } finally {
-        window.location.href = '/login.html';
+        window.location.href = 'login.html';
     }
 }
 
