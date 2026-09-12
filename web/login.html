@@ -236,9 +236,10 @@
                 throw new Error(data.error || 'เข้าสู่ระบบไม่สำเร็จ');
             }
 
+            // ตรงส่วนย้ายหน้า ให้แก้เป็นบรรทัดนี้ทั้งหมด:
             localStorage.setItem('isLoggedIn', 'true');
             localStorage.setItem('username', username);
-            window.location.href = './'; // <--- จุดที่ 1: กรณี API สำเร็จ
+            window.location.href = 'index.html';
 
         } catch (error) {
             const validDemoUsers = {
