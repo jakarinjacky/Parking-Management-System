@@ -1,17 +1,22 @@
-function handleLogin(e) {
-    e.preventDefault();
-    const user = document.getElementById('username').value;
-    const pass = document.getElementById('password').value;
+<!-- โค้ด HTML เดิมของไฟล์ login.html -->
 
-    // ตั้งชื่อผู้ใช้และรหัสผ่านตามต้องการ (เช่น admin / 1234)
-    if (user === 'admin' && pass === '1234') {
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('username', user);
-        window.location.href = 'index.html';
-    } else {
-        alert('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-    }
-}
+    <script>
+        function handleLogin(e) {
+            e.preventDefault();
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+
+            if (user === 'admin' && pass === '1234') {
+                localStorage.setItem('isLoggedIn', 'true');
+                localStorage.setItem('username', user);
+                window.location.href = 'index.html';
+            } else {
+                alert('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+            }
+        }
+    </script>
+</body>
+</html>
 <!DOCTYPE html>
 <html lang="th">
 <head>
