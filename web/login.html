@@ -224,7 +224,6 @@
         const password = document.getElementById('password').value.trim();
 
         try {
-            // พยายามยิงไปที่ Java API
             const response = await fetch(`${API_BASE}/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -237,13 +236,11 @@
                 throw new Error(data.error || 'เข้าสู่ระบบไม่สำเร็จ');
             }
 
-            // บันทึกสถานะล็อกอิน
             localStorage.setItem('isLoggedIn', 'true');
             localStorage.setItem('username', username);
-            window.location.href = './';
+            window.location.href = './'; // <--- จุดที่ 1: กรณี API สำเร็จ
 
         } catch (error) {
-            // Fallback: หากยังไม่ได้เปิด Java Server (หรือยิง API ไม่ติด) ให้เช็กจากบัญชี Demo เพื่อทดสอบบน GitHub Pages ได้
             const validDemoUsers = {
                 'admin': 'admin123',
                 'staff01': 'staff123',
@@ -254,7 +251,7 @@
             if (validDemoUsers[username] && validDemoUsers[username] === password) {
                 localStorage.setItem('isLoggedIn', 'true');
                 localStorage.setItem('username', username);
-                window.location.href = 'index.html';
+                window.location.href = './'; // <--- จุดที่ 2: กรณี Demo Mode (แก้จุดนี้ด้วย)
             } else {
                 errorBox.textContent = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
                 errorBox.style.display = 'block';
