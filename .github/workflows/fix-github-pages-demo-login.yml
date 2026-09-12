@@ -1,0 +1,123 @@
+name: Fix GitHub Pages demo login flow
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-github-pages-demo-login.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-demo-login:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Patch app.js for GitHub Pages demo auth
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('web/js/app.js')
+          text = path.read_text(encoding='utf-8')
+
+          old_init = '''async function initializeSession() {
+    try {
+        const res = await fetch(`${API_BASE}/session`, { credentials: 'include' });
+        if (!res.ok) {
+            throw new Error('Session missing');
+        }
+
+        const data = await res.json();
+        appState.currentUser = data;
+        updateCurrentUserBadge(data);
+        return true;
+    } catch (err) {
+        window.location.href = 'login.html';
+        return false;
+    }
+}'''
+
+          new_init = '''async function initializeSession() {
+    // GitHub Pages เป็น static hosting จึงใช้ Demo Login ผ่าน localStorage
+    if (window.location.hostname.endsWith('github.io')) {
+        const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+        const username = localStorage.getItem('username');
+
+        if (!isLoggedIn || !username) {
+            window.location.href = 'login.html';
+            return false;
+        }
+
+        const demoUser = {
+            username: username,
+            displayName: username === 'admin' ? 'Administrator' : username,
+            role: username === 'admin' ? 'admin' : 'staff'
+        };
+        appState.currentUser = demoUser;
+        updateCurrentUserBadge(demoUser);
+        return true;
+    }
+
+    // Local/hosted backend mode
+    try {
+        const res = await fetch(`${API_BASE}/session`, { credentials: 'include' });
+        if (!res.ok) {
+            throw new Error('Session missing');
+        }
+
+        const data = await res.json();
+        appState.currentUser = data;
+        updateCurrentUserBadge(data);
+        return true;
+    } catch (err) {
+        window.location.href = 'login.html';
+        return false;
+    }
+}'''
+
+          old_logout = '''async function logout() {
+    try {
+        await fetch(`${API_BASE}/logout`, { method: 'POST', credentials: 'include' });
+    } catch (err) {
+        console.warn('Logout request failed:', err);
+    } finally {
+        window.location.href = 'login.html';
+    }
+}'''
+
+          new_logout = '''async function logout() {
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('username');
+
+    if (!window.location.hostname.endsWith('github.io')) {
+        try {
+            await fetch(`${API_BASE}/logout`, { method: 'POST', credentials: 'include' });
+        } catch (err) {
+            console.warn('Logout request failed:', err);
+        }
+    }
+
+    window.location.href = 'login.html';
+}'''
+
+          if old_init not in text:
+              raise SystemExit('initializeSession block not found; aborting safely')
+          if old_logout not in text:
+              raise SystemExit('logout block not found; aborting safely')
+
+          text = text.replace(old_init, new_init, 1)
+          text = text.replace(old_logout, new_logout, 1)
+          path.write_text(text, encoding='utf-8')
+          print('Patched GitHub Pages demo authentication successfully.')
+          PY
+
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/js/app.js
+          git commit -m "Fix demo login on GitHub Pages"
+          git push
