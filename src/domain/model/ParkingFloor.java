@@ -46,6 +46,12 @@ public class ParkingFloor {
                 .findFirst();
     }
 
+    public Optional<Slot> findAvailableSlotFor(Vehicle vehicle, SlotType preferredType) {
+        return slots.stream()
+                .filter(s -> s.getSlotType() == preferredType && s.canFitVehicle(vehicle))
+                .findFirst();
+    }
+
     public long getAvailableCount() {
         return slots.stream().filter(Slot::isAvailable).count();
     }

@@ -1,5 +1,7 @@
 package test;
 
+import domain.enums.MembershipType;
+import domain.enums.PaymentMethod;
 import domain.enums.SlotType;
 import domain.enums.VehicleType;
 import domain.factory.SlotFactory;
@@ -12,10 +14,15 @@ import domain.observer.DisplayBoard;
 import domain.payment.CashPayment;
 import domain.payment.PromptPayPayment;
 import domain.strategy.PricingStrategy;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Map;
 import repository.PaymentRepository;
 import repository.TicketRepository;
+import service.ParkingService;
 
 /**
  * Automated Unit Test Suite
@@ -35,6 +42,10 @@ public class ParkingSystemTest {
         testPricingStrategies();
         testParkingLotAndObserverWorkflow();
         testPaymentProcessing();
+        testServerAuthoritativePaymentAmount();
+        testReservationMembershipAndDashboard();
+        testMembershipAndReservationPersistence();
+        testLostTicketIncludesParkingFee();
         testAIServicesAndExplainability();
 
         System.out.println("\n-------------------------------------------------");
@@ -166,8 +177,132 @@ public class ParkingSystemTest {
         assertTrue("Cash payment with insufficient amount fails", !failSuccess);
     }
 
+    private static void testServerAuthoritativePaymentAmount() {
+        System.out.println("\n5. Testing Server-Authoritative Payment Amount:");
+
+        ParkingLot lot = new ParkingLot("Payment Test Lot", "Bangkok");
+        ParkingFloor floor = new ParkingFloor(1, "Floor 1");
+        floor.addSlot(SlotFactory.createSlot("PAY-01", 1, SlotType.STANDARD));
+        lot.addFloor(floor);
+
+        ParkingService service = new ParkingService(
+                lot,
+                new TicketRepository(),
+                new PaymentRepository(),
+                new DisplayBoard("PAY-BOARD")
+        );
+        Map<String, Object> checkIn = service.checkIn(VehicleType.CAR, "PAY-TEST", false);
+        String ticketId = (String) checkIn.get("ticketId");
+        service.fastForwardMinutes(60);
+
+        double expectedFee = ((Number) service.calculateFee(ticketId).get("fee")).doubleValue();
+        Map<String, Object> receipt = service.processPayment(
+            ticketId, PaymentMethod.PROMPTPAY, null, null, null
+        );
+
+        assertTrue("Payment uses the server-calculated amount", ((Number) receipt.get("amount")).doubleValue() == expectedFee);
+        assertTrue("Ticket stores the server-calculated amount", service.getTicketRepository()
+                .findById(ticketId).get().getFee() == expectedFee);
+    }
+
+    private static void testReservationMembershipAndDashboard() {
+        System.out.println("\n6. Testing Reservations, Memberships & Dashboard:");
+
+        ParkingLot lot = new ParkingLot("Feature Test Lot", "Bangkok");
+        ParkingFloor floor = new ParkingFloor(1, "Floor 1");
+        floor.addSlot(SlotFactory.createSlot("FEATURE-01", 1, SlotType.STANDARD));
+        lot.addFloor(floor);
+        ParkingService service = new ParkingService(lot, new TicketRepository(), new PaymentRepository(), new DisplayBoard("FEATURE-BOARD"));
+
+        LocalDateTime reservationStart = service.getCurrentTime().plusMinutes(30);
+        Map<String, Object> reservation = service.createReservation("RSV-TEST", VehicleType.CAR, false,
+                reservationStart, reservationStart.plusHours(2));
+        service.fastForwardMinutes(30);
+        Map<String, Object> checkIn = service.checkIn(VehicleType.CAR, "RSV-TEST", false);
+        assertTrue("Reservation is consumed at check-in", reservation.get("reservationId").equals(checkIn.get("reservationId")));
+
+        ParkingLot memberLot = new ParkingLot("Member Test Lot", "Bangkok");
+        ParkingFloor memberFloor = new ParkingFloor(1, "Floor 1");
+        memberFloor.addSlot(SlotFactory.createSlot("MEMBER-01", 1, SlotType.STANDARD));
+        memberLot.addFloor(memberFloor);
+        ParkingService memberService = new ParkingService(memberLot, new TicketRepository(), new PaymentRepository(), new DisplayBoard("MEMBER-BOARD"));
+        LocalDate today = memberService.getCurrentTime().toLocalDate();
+        memberService.createMembership("MEM-1", "Monthly Driver", "MEM-TEST", MembershipType.STANDARD_MEMBER, today, today.plusDays(30));
+        Map<String, Object> memberCheckIn = memberService.checkIn(VehicleType.CAR, "MEM-TEST", false);
+        String memberTicket = (String) memberCheckIn.get("ticketId");
+        assertTrue("Check-in verifies active membership on the server", Boolean.TRUE.equals(memberCheckIn.get("memberVerified")));
+        assertTrue("Monthly member is charged zero hourly fee", ((Number) memberService.calculateFee(memberTicket).get("fee")).doubleValue() == 0.0);
+
+        Map<String, Object> dashboard = memberService.getDailyDashboard(today);
+        assertTrue("Dashboard counts active membership", ((Number) dashboard.get("activeMembers")).longValue() == 1);
+        assertTrue("Dashboard reports current occupancy", ((Number) dashboard.get("occupiedSlots")).longValue() == 1);
+
+        ParkingLot vipLot = new ParkingLot("VIP Test Lot", "Bangkok");
+        ParkingFloor vipFloor = new ParkingFloor(1, "Floor 1");
+        vipFloor.addSlot(SlotFactory.createSlot("VIP-01", 1, SlotType.VIP));
+        vipFloor.addSlot(SlotFactory.createSlot("VIP-02", 1, SlotType.STANDARD));
+        vipLot.addFloor(vipFloor);
+        ParkingService vipService = new ParkingService(vipLot, new TicketRepository(), new PaymentRepository(), new DisplayBoard("VIP-BOARD"));
+        vipService.createMembership("VIP-1", "VIP Driver", "VIP-TEST", MembershipType.VIP_MEMBER, today, today.plusDays(30));
+        Map<String, Object> vipCheckIn = vipService.checkIn(VehicleType.CAR, "VIP-TEST", false);
+        assertTrue("VIP member receives VIP zone priority", "VIP-01".equals(vipCheckIn.get("slotNumber")));
+
+        ParkingLot evLot = new ParkingLot("EV Member Test Lot", "Bangkok");
+        ParkingFloor evFloor = new ParkingFloor(1, "Floor 1");
+        evFloor.addSlot(SlotFactory.createSlot("EV-MEMBER-01", 1, SlotType.EV_CHARGING));
+        evLot.addFloor(evFloor);
+        ParkingService evService = new ParkingService(evLot, new TicketRepository(), new PaymentRepository(), new DisplayBoard("EV-MEMBER-BOARD"));
+        evService.createMembership("EV-1", "EV Driver", "EV-MEMBER-TEST", MembershipType.EV_MEMBER, today, today.plusDays(30));
+        Map<String, Object> evCheckIn = evService.checkIn(VehicleType.ELECTRIC_VEHICLE, "EV-MEMBER-TEST", false);
+        assertTrue("EV member is assigned to charging slot", "EV-MEMBER-01".equals(evCheckIn.get("slotNumber")));
+    }
+
+    private static void testLostTicketIncludesParkingFee() {
+        System.out.println("\n8. Testing Lost Ticket Parking Fee:");
+
+        ParkingLot lot = new ParkingLot("Lost Ticket Test Lot", "Bangkok");
+        ParkingFloor floor = new ParkingFloor(1, "Floor 1");
+        floor.addSlot(SlotFactory.createSlot("LOST-01", 1, SlotType.STANDARD));
+        lot.addFloor(floor);
+        ParkingService service = new ParkingService(lot, new TicketRepository(), new PaymentRepository(), new DisplayBoard("LOST-BOARD"));
+
+        String ticketId = (String) service.checkIn(VehicleType.CAR, "LOST-TEST", false).get("ticketId");
+        service.fastForwardMinutes(180);
+        Map<String, Object> lostFee = service.markTicketLost(ticketId);
+
+        // 3 hours for a standard car is 80 THB; lost-ticket total is 80 + 300.
+        assertTrue("Lost ticket includes the accumulated parking fee", ((Number) lostFee.get("fee")).doubleValue() == 380.0);
+        assertTrue("Lost ticket strategy explains both charges", ((String) lostFee.get("rateDescription")).contains("ค่าจอดตามเวลาจริง"));
+    }
+
+    private static void testMembershipAndReservationPersistence() {
+        System.out.println("\n7. Testing Membership & Reservation Persistence:");
+        try {
+            Path tempDirectory = Files.createTempDirectory("parking-persistence-test");
+            Path membershipFile = tempDirectory.resolve("memberships.db");
+            Path reservationFile = tempDirectory.resolve("reservations.db");
+            LocalDate today = LocalDate.now();
+
+            repository.MembershipRepository membershipRepository = new repository.MembershipRepository(membershipFile);
+            membershipRepository.save(new domain.model.Membership(
+                    "PERSIST-MEM", "Persistent Member", "PERSIST-001",
+                    MembershipType.VIP_MEMBER, today, today.plusDays(30)));
+            assertTrue("Membership survives repository reload", new repository.MembershipRepository(membershipFile)
+                    .findValidByPlate("PERSIST-001", today).isPresent());
+
+            repository.ReservationRepository reservationRepository = new repository.ReservationRepository(reservationFile);
+            reservationRepository.save(new domain.model.Reservation(
+                    "PERSIST-RSV", "PERSIST-002", VehicleType.CAR, false,
+                    LocalDateTime.now(), LocalDateTime.now().plusHours(1)));
+            assertTrue("Reservation survives repository reload", new repository.ReservationRepository(reservationFile)
+                    .findById("PERSIST-RSV").isPresent());
+        } catch (java.io.IOException ex) {
+            assertTrue("Persistence test can create temporary storage", false);
+        }
+    }
+
     private static void testAIServicesAndExplainability() {
-        System.out.println("\n5. Testing AI Services & Explainable AI (XAI):");
+        System.out.println("\n9. Testing AI Services & Explainable AI (XAI):");
 
         domain.ai.AIParkingService aiService = new domain.ai.AIParkingService();
         ParkingLot lot = new ParkingLot("AI Test Mall", "Bangkok");

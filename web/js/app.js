@@ -13,11 +13,51 @@ let appState = {
     selectedPayMethod: 'PROMPTPAY',
     currentFeePreview: null,
     activeTickets: [],
-    isServerOnline: false
+    isServerOnline: false,
+    currentUser: null
 };
 
+async function initializeSession() {
+    try {
+        const res = await fetch(`${API_BASE}/session`, { credentials: 'include' });
+        if (!res.ok) {
+            throw new Error('Session missing');
+        }
+
+        const data = await res.json();
+        appState.currentUser = data;
+        updateCurrentUserBadge(data);
+        return true;
+    } catch (err) {
+        window.location.href = '/login.html';
+        return false;
+    }
+}
+
+function updateCurrentUserBadge(user) {
+    const badge = document.getElementById('currentUserBadge');
+    if (!badge || !user) return;
+
+    const label = user.role === 'admin' ? 'ADMIN' : 'STAFF';
+    badge.innerText = `${user.displayName} (${label})`;
+    badge.title = `Username: ${user.username}`;
+}
+
+async function logout() {
+    try {
+        await fetch(`${API_BASE}/logout`, { method: 'POST', credentials: 'include' });
+    } catch (err) {
+        console.warn('Logout request failed:', err);
+    } finally {
+        window.location.href = '/login.html';
+    }
+}
+
 // --- Initialization ---
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    const sessionReady = await initializeSession();
+    if (!sessionReady) return;
+
     loadSystemStatus();
     loadParkingLotData();
     loadTicketsAndPayments();
@@ -46,6 +86,85 @@ function switchTab(tabId) {
         loadTicketsAndPayments();
     } else if (tabId === 'exit-cashier') {
         refreshActivePlateChips();
+    } else if (tabId === 'dashboard') {
+        loadDailyDashboard();
+    }
+}
+
+async function loadDailyDashboard() {
+    const dateInput = document.getElementById('dashboardDate');
+    if (!dateInput) return;
+    if (!dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+    try {
+        const res = await fetch(`${API_BASE}/dashboard/daily?date=${dateInput.value}`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Dashboard request failed');
+        const data = await res.json();
+        document.getElementById('dailyRevenue').innerText = `฿${Number(data.revenue || 0).toFixed(2)}`;
+        document.getElementById('dailyOccupancy').innerText = `${data.occupancyRate || 0}%`;
+        document.getElementById('dailyReservations').innerText = data.reservationCount || 0;
+        document.getElementById('dailyMembers').innerText = data.activeMembers || 0;
+        document.getElementById('dashboardMessage').innerText = `${data.occupiedSlots}/${data.totalCapacity} ช่องกำลังใช้งาน | ชำระแล้ว ${data.paidTickets} รายการ`;
+        loadFeatureLists();
+    } catch (err) {
+        document.getElementById('dashboardMessage').innerText = 'ไม่สามารถโหลด Dashboard ได้';
+    }
+}
+
+async function createReservation(event) {
+    event.preventDefault();
+    const payload = {
+        licensePlate: document.getElementById('reservationPlate').value,
+        vehicleType: document.getElementById('reservationType').value,
+        requiresCharging: document.getElementById('reservationCharging').checked,
+        startTime: document.getElementById('reservationStart').value,
+        endTime: document.getElementById('reservationEnd').value
+    };
+    await submitFeatureForm('/reservations', payload, 'สร้างการจองสำเร็จ');
+}
+
+async function loadFeatureLists() {
+    try {
+        const [reservationResponse, membershipResponse] = await Promise.all([
+            fetch(`${API_BASE}/reservations`, { credentials: 'include' }),
+            fetch(`${API_BASE}/memberships`, { credentials: 'include' })
+        ]);
+        if (!reservationResponse.ok || !membershipResponse.ok) throw new Error('Feature list request failed');
+        const reservations = await reservationResponse.json();
+        const memberships = await membershipResponse.json();
+        document.getElementById('reservationsList').innerHTML = reservations.length
+            ? reservations.slice(-5).reverse().map(item => `<div class="feature-list-item"><strong>${item.licensePlate}</strong><span>${item.vehicleType} | ${item.startTime.replace('T', ' ')}</span><em>${item.checkedIn ? 'เข้าจอดแล้ว' : item.cancelled ? 'ยกเลิก' : 'รอเข้าจอด'}</em></div>`).join('')
+            : '<span class="text-muted">ยังไม่มีข้อมูล</span>';
+        document.getElementById('membershipsList').innerHTML = memberships.length
+            ? memberships.slice(-5).reverse().map(item => `<div class="feature-list-item"><strong>${item.licensePlate}</strong><span>${item.memberName} | ${item.membershipTypeDisplay || item.membershipType || 'STANDARD_MEMBER'}</span><em>ถึง ${item.validUntil}</em></div>`).join('')
+            : '<span class="text-muted">ยังไม่มีข้อมูล</span>';
+    } catch (err) {
+        document.getElementById('reservationsList').innerHTML = '<span class="text-muted">เข้าสู่ระบบเพื่อดูรายการ</span>';
+        document.getElementById('membershipsList').innerHTML = '<span class="text-muted">เข้าสู่ระบบเพื่อดูรายการ</span>';
+    }
+}
+
+async function createMembership(event) {
+    event.preventDefault();
+    const payload = {
+        memberId: document.getElementById('memberId').value,
+        memberName: document.getElementById('memberName').value,
+        licensePlate: document.getElementById('memberPlate').value,
+        membershipType: document.getElementById('memberType').value,
+        validFrom: document.getElementById('memberFrom').value,
+        validUntil: document.getElementById('memberUntil').value
+    };
+    await submitFeatureForm('/memberships', payload, 'บันทึกสมาชิกสำเร็จ');
+}
+
+async function submitFeatureForm(path, payload, successMessage) {
+    try {
+        const res = await fetch(`${API_BASE}${path}`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'บันทึกข้อมูลไม่สำเร็จ');
+        document.getElementById('dashboardMessage').innerText = successMessage;
+        loadDailyDashboard();
+    } catch (err) {
+        document.getElementById('dashboardMessage').innerText = err.message;
     }
 }
 
@@ -53,7 +172,7 @@ function switchTab(tabId) {
 
 async function loadSystemStatus() {
     try {
-        const res = await fetch(`${API_BASE}/status`);
+        const res = await fetch(`${API_BASE}/status`, { credentials: 'include' });
         if (!res.ok) throw new Error('Network error');
         const data = await res.json();
         appState.statusData = data;
@@ -71,7 +190,7 @@ async function loadSystemStatus() {
 
 async function loadParkingLotData() {
     try {
-        const res = await fetch(`${API_BASE}/lot`);
+        const res = await fetch(`${API_BASE}/lot`, { credentials: 'include' });
         if (!res.ok) throw new Error('Network error');
         const floors = await res.json();
         appState.floorsData = floors;
@@ -86,7 +205,7 @@ async function loadParkingLotData() {
 
 async function loadTicketsAndPayments() {
     try {
-        const res = await fetch(`${API_BASE}/tickets`);
+        const res = await fetch(`${API_BASE}/tickets`, { credentials: 'include' });
         if (!res.ok) throw new Error('Network error');
         const tickets = await res.json();
         appState.activeTickets = tickets;
@@ -206,6 +325,89 @@ function formatDurationMinutes(minutes) {
 
 // --- Check-In Form Handling ---
 
+async function triggerAiAnprScan() {
+    const button = document.getElementById('btnTriggerAnpr');
+    const plateInput = document.getElementById('licensePlate');
+    const resultBox = document.getElementById('anprResultBox');
+    const targetText = document.getElementById('anprTargetText');
+
+    button.disabled = true;
+    targetText.innerText = 'กำลังอ่านทะเบียนจากกล้อง...';
+
+    try {
+        const response = await fetch(`${API_BASE}/ai/anpr-entry`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ licensePlate: plateInput.value.trim() })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'ANPR scan failed');
+
+        plateInput.value = data.detectedPlate;
+        selectVehicleTypeFromAnpr(data.detectedType);
+        document.getElementById('anprConfidenceText').innerText = `Confidence: ${data.confidence}%`;
+        document.getElementById('anprExplanationText').innerText = data.membershipMatched
+            ? `ตรวจพบสมาชิก ${data.memberName} (ถึง ${data.membershipValidUntil}) ระบบยืนยันตัวตนและเปิดไม้กั้นอัตโนมัติ`
+            : data.message || data.explanation;
+        resultBox.style.display = 'block';
+        targetText.innerText = data.membershipMatched ? 'สมาชิกยืนยันแล้ว — เปิดไม้กั้นอัตโนมัติ' : 'สแกนสำเร็จ — รอพนักงานยืนยัน';
+
+        if (data.autoEntry && data.ticket) {
+            updateEntryMemberStatus(data.ticket);
+            animateGate('entry', () => {
+                showTicketModal(data.ticket);
+                loadParkingLotData();
+                loadSystemStatus();
+            });
+        }
+    } catch (error) {
+        targetText.innerText = 'สแกนไม่สำเร็จ กรุณาตรวจสอบทะเบียนและลองใหม่';
+        alert('ANPR: ' + error.message);
+    } finally {
+        button.disabled = false;
+    }
+}
+
+let aiRecommendationTimer;
+
+function debounceAiRecommend() {
+    clearTimeout(aiRecommendationTimer);
+    aiRecommendationTimer = setTimeout(requestAiRecommendation, 250);
+}
+
+async function requestAiRecommendation() {
+    const plate = document.getElementById('licensePlate')?.value.trim();
+    if (!plate || !appState.isServerOnline) return;
+
+    const type = document.querySelector('input[name="vType"]:checked')?.value || 'CAR';
+    const requiresCharging = document.getElementById('requiresCharging')?.checked || false;
+    try {
+        const response = await fetch(`${API_BASE}/ai/recommend`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vehicleType: type, requiresCharging: requiresCharging.toString() })
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        document.getElementById('aiRecSlotBadge').innerText = `ช่องแนะนำ: ${data.slotNumber}`;
+        document.getElementById('aiMatchScoreBadge').innerText = `${Number(data.matchScore || 0).toFixed(1)}% Match`;
+        document.getElementById('aiRecReasonText').innerText = data.primaryReason || 'AI กำลังวิเคราะห์ช่องจอดที่เหมาะสม';
+        document.getElementById('aiEnergyText').innerText = `ประหยัดพลังงาน: ${data.energyEfficiency || 'ลดการวนรถในอาคาร'}`;
+        document.getElementById('aiCongestionText').innerText = `การจราจร: ${data.congestionImpact || 'ลดความหนาแน่นของทางเข้า'}`;
+    } catch (error) {
+        console.warn('AI recommendation unavailable:', error);
+    }
+}
+
+function selectVehicleTypeFromAnpr(type) {
+    const radio = document.querySelector(`input[name="vType"][value="${type}"]`);
+    if (!radio) return;
+    radio.checked = true;
+    updateVehicleSelection();
+}
+
 function updateVehicleSelection() {
     const selectedType = document.querySelector('input[name="vType"]:checked').value;
     const cards = document.querySelectorAll('.type-card');
@@ -257,6 +459,7 @@ async function handleCheckIn(e) {
         if (appState.isServerOnline) {
             const res = await fetch(`${API_BASE}/park`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     licensePlate: plate,
@@ -283,6 +486,7 @@ async function handleCheckIn(e) {
         }
 
         // Animate Entry Gate
+        updateEntryMemberStatus(ticketData);
         animateGate('entry', () => {
             showTicketModal(ticketData);
             loadParkingLotData();
@@ -312,6 +516,21 @@ function showTicketModal(ticket) {
     document.getElementById('modalBarcodeText').innerText = ticket.ticketId;
 
     document.getElementById('ticketModalOverlay').classList.add('active');
+}
+
+function updateEntryMemberStatus(ticket) {
+    const row = document.getElementById('modalMemberRow');
+    const status = document.getElementById('modalMemberStatus');
+    if (!row || !status) return;
+
+    row.style.display = 'flex';
+    if (ticket.memberVerified === true || ticket.member === true) {
+        status.className = 'text-success';
+        status.innerText = `ยืนยันสมาชิกแล้ว${ticket.memberName ? `: ${ticket.memberName}` : ''}${ticket.membershipValidUntil ? ` (ถึง ${ticket.membershipValidUntil})` : ''}`;
+    } else {
+        status.className = 'text-muted';
+        status.innerText = 'ตรวจสอบแล้ว: ไม่มีสิทธิ์สมาชิกที่ใช้งานได้';
+    }
 }
 
 // --- Exit & Cashier Handling ---
@@ -362,6 +581,7 @@ async function searchTicketForExit() {
         if (appState.isServerOnline) {
             const res = await fetch(`${API_BASE}/calculate-fee`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ticketIdOrPlate: query })
             });
@@ -408,6 +628,15 @@ function renderFeePreview(fee) {
     document.getElementById('feeRateDesc').innerText = fee.rateDescription;
     document.getElementById('feeAmountHero').innerText = `฿${fee.fee.toFixed(2)}`;
     document.getElementById('qrAmountDisplay').innerText = `฿${fee.fee.toFixed(2)}`;
+
+    const isLostTicket = fee.isLostTicket === true || fee.status === 'LOST';
+    const breakdown = document.getElementById('lostTicketBreakdown');
+    breakdown.style.display = isLostTicket ? 'grid' : 'none';
+    if (isLostTicket) {
+        document.getElementById('parkingFeeAmount').innerText = `฿${Number(fee.parkingFee || 0).toFixed(2)}`;
+        document.getElementById('lostTicketPenaltyAmount').innerText = `฿${Number(fee.lostTicketPenalty || 300).toFixed(2)}`;
+        document.getElementById('lostTicketTotalAmount').innerText = `฿${Number(fee.fee || 0).toFixed(2)}`;
+    }
 
     // Set default cash tendered to exact or rounded
     document.getElementById('cashTenderedInput').value = Math.ceil(fee.fee / 10) * 10;
@@ -460,7 +689,6 @@ async function submitPayment() {
     const payload = {
         ticketId: fee.ticketId,
         method: method,
-        amount: fee.fee.toString(),
         cashTendered: method === 'CASH' ? document.getElementById('cashTenderedInput').value : null,
         cardNumber: method === 'CREDIT_CARD' ? document.getElementById('ccNumber').value : null,
         cardHolder: method === 'CREDIT_CARD' ? document.getElementById('ccHolder').value : null
@@ -471,6 +699,7 @@ async function submitPayment() {
         if (appState.isServerOnline) {
             const res = await fetch(`${API_BASE}/pay`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
@@ -528,6 +757,7 @@ async function finishPaymentAndOpenExitGate() {
         try {
             await fetch(`${API_BASE}/exit`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ticketId: ticketId })
             });
@@ -552,7 +782,7 @@ async function handleLostTicket() {
         alert('กรุณากรอกป้ายทะเบียนรถที่ทำตั๋วสูญหาย');
         return;
     }
-    if (!confirm(`ยืนยันการแจ้งตั๋วสูญหายสำหรับ ${query}?\nระบบจะคิดค่าปรับ 300 บาท ตามระเบียบลานจอดรถ`)) {
+    if (!confirm(`ยืนยันการแจ้งตั๋วสูญหายสำหรับ ${query}?\nระบบจะคิดค่าจอดตามเวลาจริงรวมค่าปรับตั๋วหาย 300 บาท`)) {
         return;
     }
 
@@ -560,6 +790,7 @@ async function handleLostTicket() {
         if (appState.isServerOnline) {
             const res = await fetch(`${API_BASE}/lost-ticket`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ticketIdOrPlate: query })
             });
@@ -568,7 +799,7 @@ async function handleLostTicket() {
             appState.currentFeePreview = data;
             renderFeePreview(data);
         } else {
-            alert('แจ้งตั๋วสูญหายสำเร็จ (ค่าปรับ 300 บาท)');
+            alert('แจ้งตั๋วสูญหายสำเร็จ ระบบรวมค่าจอดตามเวลาจริงและค่าปรับ 300 บาทแล้ว');
         }
     } catch (err) {
         alert('เกิดข้อผิดพลาด: ' + err.message);
@@ -582,6 +813,7 @@ async function fastForward(minutes) {
         if (appState.isServerOnline) {
             await fetch(`${API_BASE}/time-travel`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ minutes: minutes.toString() })
             });
@@ -601,6 +833,7 @@ async function resetSimTime() {
         if (appState.isServerOnline) {
             await fetch(`${API_BASE}/time-travel`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'reset' })
             });

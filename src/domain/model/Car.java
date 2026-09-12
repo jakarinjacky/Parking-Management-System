@@ -13,6 +13,6 @@ public class Car extends Vehicle {
     @Override
     public boolean canParkIn(Slot slot) {
         SlotType type = slot.getSlotType();
-        return type == SlotType.STANDARD || type == SlotType.LARGE || type == SlotType.COMPACT;
+        return type == SlotType.STANDARD || type == SlotType.LARGE || type == SlotType.COMPACT || type == SlotType.VIP;
     }
 }

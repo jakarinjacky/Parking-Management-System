@@ -137,6 +137,19 @@ java -cp bin server.ParkingServer
 
 ## 💻 ฟังก์ชันและการใช้งานระบบบนหน้าเว็บ (Web Features)
 
+### ฟีเจอร์เสริมสำหรับการใช้งานจริง
+- **Reservation**: จองล่วงหน้าผ่าน `POST /api/reservations` พร้อมทะเบียน ประเภทรถ และช่วงเวลา ระบบจะผูก reservation กับ ticket เมื่อรถเข้าจอดจริง
+- **Membership Types**: ลงทะเบียนผ่าน `POST /api/memberships` ได้ 3 ประเภท: `STANDARD_MEMBER` จัดช่องทั่วไป, `VIP_MEMBER` ให้โซน VIP ก่อน, `EV_MEMBER` จัดช่อง EV เมื่อจำเป็น โดยไม่มีช่องประจำถาวร
+- **Daily Dashboard**: ดูรายได้ จำนวนรายการชำระ อัตราการใช้พื้นที่ การจอง และสมาชิกที่ใช้งานผ่าน `GET /api/dashboard/daily?date=YYYY-MM-DD`
+- **ANPR Member Auto-Entry**: `POST /api/ai/anpr-entry` ตรวจทะเบียนจากกล้องกับสมาชิกที่ยัง valid; ถ้าตรงกัน server จะ check-in และสั่งเปิดไม้กั้นอัตโนมัติ ถ้าไม่ตรงจะรอพนักงานยืนยัน
+
+### ขอบเขตและข้อจำกัดของโครงงาน
+- ระบบนี้เป็น **academic simulation** สำหรับสาธิต OOP, Design Patterns, REST workflow และ AI rule-based ไม่ใช่ production deployment
+- Membership และ Reservation ถูกบันทึกลงไฟล์ในโฟลเดอร์ `data/` เพื่อคงข้อมูลเมื่อ restart server
+- Ticket และ Payment ยังเป็น in-memory runtime ledger และจะถูกสร้างใหม่เมื่อ restart เพื่อให้สอดคล้องกับโหมดจำลอง
+- `Map<String, Object>` ใช้เป็น JSON transport boundary ของ service/server เพื่อให้หน้าเว็บเรียก API ได้ง่าย; business rules สำคัญยังอยู่ใน typed domain model และ enum
+- ยังไม่มีฐานข้อมูลจริง, transaction, payment gateway, hardware ANPR หรือการจัดการ secret สำหรับ production
+
 1. **แผนผังช่องจอดรถ (2D Lot Map)**:
    - แสดงช่องจอดแยกตามชั้น (ชั้น 1: VIP & EV & เก๋ง, ชั้น 2: เก๋ง & รถเล็ก, ชั้น 3: มอเตอร์ไซค์ & รถใหญ่)
    - สีของช่องจอดแสดงสถานะแบบเรียลไทม์ (เขียว = ว่าง, แดง = มีรถจอด, ฟ้า = หัวชาร์จ EV)
@@ -152,6 +165,6 @@ java -cp bin server.ParkingServer
    - แสดงคำนวณค่าจอดแยกตาม Pricing Strategy
    - รองรับ 3 ช่องทางชำระ: **PromptPay QR**, **Credit Card**, **เงินสด** (คำนวณเงินทอนอัตโนมัติ)
    - ออกใบเสร็จรับเงินอย่างเป็นทางการ (Official Receipt Modal)
-   - รองรับปุ่ม **"ตั๋วหาย"** คิดค่าปรับ 300 บาทตามข้อกำหนด
+   - รองรับปุ่ม **"ตั๋วหาย"** คิดค่าจอดตามเวลาจริงรวมค่าปรับ 300 บาท
 5. **แท็บ OOP Architecture & SOLID Explorer**:
    - หน้าอธิบายหลักการ OOP และ Design Patterns ที่ใช้ในระบบเพื่อการเรียนรู้และการนำเสนอ

@@ -1,7 +1,7 @@
 package service;
 
+import domain.enums.MembershipType;
 import domain.enums.PaymentMethod;
-import domain.enums.PaymentStatus;
 import domain.enums.TicketStatus;
 import domain.enums.VehicleType;
 import domain.factory.VehicleFactory;
@@ -12,14 +12,16 @@ import domain.payment.CreditCardPayment;
 import domain.payment.Payment;
 import domain.payment.PromptPayPayment;
 import domain.strategy.PricingStrategy;
-import repository.PaymentRepository;
-import repository.TicketRepository;
-
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
+import repository.MembershipRepository;
+import repository.PaymentRepository;
+import repository.ReservationRepository;
+import repository.TicketRepository;
 
 /**
  * Service Layer / Facade: ParkingService
@@ -27,10 +29,13 @@ import java.util.concurrent.atomic.AtomicLong;
  * เชื่อมโยง Domain Model, Repositories, Observer, และ Pricing Strategies
  */
 public class ParkingService {
+    private static final double LOST_TICKET_PENALTY = 300.0;
     private final ParkingLot parkingLot;
     private final TicketRepository ticketRepository;
     private final PaymentRepository paymentRepository;
     private final DisplayBoard displayBoard;
+    private final ReservationRepository reservationRepository;
+    private final MembershipRepository membershipRepository;
     private final AtomicLong ticketSequence = new AtomicLong(1000);
     private final AtomicLong paymentSequence = new AtomicLong(5000);
 
@@ -43,10 +48,22 @@ public class ParkingService {
                           TicketRepository ticketRepository,
                           PaymentRepository paymentRepository,
                           DisplayBoard displayBoard) {
+        this(parkingLot, ticketRepository, paymentRepository, displayBoard,
+            new ReservationRepository(), new MembershipRepository());
+        }
+
+        public ParkingService(ParkingLot parkingLot,
+                  TicketRepository ticketRepository,
+                  PaymentRepository paymentRepository,
+                  DisplayBoard displayBoard,
+                  ReservationRepository reservationRepository,
+                  MembershipRepository membershipRepository) {
         this.parkingLot = parkingLot;
         this.ticketRepository = ticketRepository;
         this.paymentRepository = paymentRepository;
         this.displayBoard = displayBoard;
+        this.reservationRepository = reservationRepository;
+        this.membershipRepository = membershipRepository;
         this.aiParkingService = new domain.ai.AIParkingService();
         this.simulatedTime = LocalDateTime.now();
 
@@ -90,11 +107,30 @@ public class ParkingService {
             throw new IllegalStateException("ทะเบียน " + licensePlate + " มีตั๋วจอดที่ยังไม่เสร็จสิ้นอยู่ในระบบ (ช่อง " + activeTicket.get().getSlotNumber() + ")");
         }
 
+        Optional<Reservation> reservation = reservationRepository.findActiveByPlate(licensePlate)
+                .filter(r -> r.isActiveAt(simulatedTime));
+        if (reservation.isPresent()) {
+            if (reservation.get().getVehicleType() != type) {
+                throw new IllegalArgumentException("ประเภทรถไม่ตรงกับการจองล่วงหน้า");
+            }
+            requiresCharging = reservation.get().isRequiresCharging();
+        }
+
+        Optional<Membership> activeMember = membershipRepository.findValidByPlate(licensePlate, simulatedTime.toLocalDate());
+        if (activeMember.isPresent() && activeMember.get().getMembershipType() == MembershipType.EV_MEMBER) {
+            if (type != VehicleType.ELECTRIC_VEHICLE) {
+                throw new IllegalArgumentException("สมาชิก EV ต้องใช้ทะเบียนรถยนต์ไฟฟ้า");
+            }
+            requiresCharging = true;
+        }
+
         // 1. Factory Pattern: สร้าง Vehicle instance
         Vehicle vehicle = VehicleFactory.createVehicle(type, licensePlate, requiresCharging);
 
         // 2. Aggregate Root: ค้นหาและจองช่องจอด
-        Slot slot = parkingLot.parkVehicle(vehicle);
+        Slot slot = activeMember.isPresent() && activeMember.get().getMembershipType() == MembershipType.VIP_MEMBER
+            ? parkingLot.parkVehicle(vehicle, domain.enums.SlotType.VIP)
+            : parkingLot.parkVehicle(vehicle);
 
         // 3. สร้างตั๋ว Ticket
         String ticketId = "TKT-" + simulatedTime.format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-" + ticketSequence.incrementAndGet();
@@ -107,6 +143,10 @@ public class ParkingService {
                 this.simulatedTime
         );
         ticketRepository.save(ticket);
+        reservation.ifPresent(r -> {
+            r.markCheckedIn();
+            reservationRepository.save(r);
+        });
 
         Map<String, Object> result = new HashMap<>();
         result.put("ticketId", ticket.getTicketId());
@@ -118,6 +158,16 @@ public class ParkingService {
         result.put("entryTime", ticket.getEntryTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         result.put("pricingStrategy", vehicle.getPricingStrategy().getStrategyName());
         result.put("rateDescription", vehicle.getPricingStrategy().getRateDescription());
+        Optional<Membership> member = membershipRepository.findValidByPlate(ticket.getLicensePlate(), simulatedTime.toLocalDate());
+        result.put("reservationId", reservation.map(Reservation::getReservationId).orElse(null));
+        result.put("member", member.isPresent());
+        result.put("memberVerified", member.isPresent());
+        result.put("membershipStatus", member.isPresent() ? "ACTIVE" : "NONE");
+        result.put("memberId", member.map(Membership::getMemberId).orElse(null));
+        result.put("memberName", member.map(Membership::getMemberName).orElse(null));
+        result.put("membershipType", member.map(m -> m.getMembershipType().name()).orElse(null));
+        result.put("membershipTypeDisplay", member.map(m -> m.getMembershipType().getDisplayName()).orElse(null));
+        result.put("membershipValidUntil", member.map(m -> m.getValidUntil().toString()).orElse(null));
         return result;
     }
 
@@ -135,13 +185,22 @@ public class ParkingService {
         long hours = (minutes + 59) / 60;
 
         double fee;
+        double parkingFee = 0.0;
+        double lostTicketPenalty = 0.0;
         String strategyName;
         String rateDescription;
 
+        boolean member = membershipRepository.findValidByPlate(ticket.getLicensePlate(), simulatedTime.toLocalDate()).isPresent();
         if (ticket.getStatus() == TicketStatus.LOST) {
-            fee = 300.0; // ค่าปรับกรณีตั๋วสูญหาย
-            strategyName = "Lost Ticket Penalty";
-            rateDescription = "ค่าธรรมเนียมปรับตั๋วสูญหาย อัตราเหมาจ่าย 300 บาท";
+            parkingFee = calculateParkingFee(ticket, duration);
+            lostTicketPenalty = LOST_TICKET_PENALTY;
+            fee = LOST_TICKET_PENALTY + parkingFee;
+            strategyName = "Lost Ticket Penalty + Parking Fee";
+            rateDescription = "ค่าจอดตามเวลาจริง " + parkingFee + " บาท + ค่าปรับตั๋วหาย " + LOST_TICKET_PENALTY + " บาท";
+        } else if (member) {
+            fee = 0.0;
+            strategyName = "Monthly Membership";
+            rateDescription = "สมาชิกแบบรายเดือน ไม่คิดค่าจอดตามชั่วโมง";
         } else {
             // ค้นหารถในช่องจอดเพื่อเรียก Strategy
             Optional<Slot> slotOpt = parkingLot.findSlot(ticket.getSlotNumber());
@@ -150,6 +209,7 @@ public class ParkingService {
 
             PricingStrategy strategy = vehicle.getPricingStrategy();
             fee = strategy.calculateFee(duration, vehicle);
+            parkingFee = fee;
             strategyName = strategy.getStrategyName();
             rateDescription = strategy.getRateDescription();
         }
@@ -167,9 +227,13 @@ public class ParkingService {
         preview.put("durationHours", hours);
         preview.put("durationDisplay", formatDuration(minutes));
         preview.put("fee", fee);
+        preview.put("parkingFee", parkingFee);
+        preview.put("lostTicketPenalty", lostTicketPenalty);
+        preview.put("isLostTicket", ticket.getStatus() == TicketStatus.LOST);
         preview.put("status", ticket.getStatus().name());
         preview.put("strategyName", strategyName);
         preview.put("rateDescription", rateDescription);
+        preview.put("member", member);
         return preview;
     }
 
@@ -178,7 +242,6 @@ public class ParkingService {
      */
     public synchronized Map<String, Object> processPayment(String ticketId,
                                                           PaymentMethod method,
-                                                          double amount,
                                                           Double cashTendered,
                                                           String cardNumber,
                                                           String cardHolder) {
@@ -192,25 +255,22 @@ public class ParkingService {
             throw new IllegalStateException("ตั๋วนี้ถูกใช้งานออกจากระบบแล้ว");
         }
 
+        double serverAmount = ((Number) calculateFee(ticketId).get("fee")).doubleValue();
+
         String paymentId = "PAY-" + paymentSequence.incrementAndGet();
         Payment payment;
 
         // Polymorphism: สร้างอินสแตนซ์ Payment ตามประเภทย่อย
         switch (method) {
-            case PROMPTPAY:
-                payment = new PromptPayPayment(paymentId, ticket.getTicketId(), amount, "0812345678");
-                break;
-            case CREDIT_CARD:
-                payment = new CreditCardPayment(paymentId, ticket.getTicketId(), amount,
+            case PROMPTPAY -> payment = new PromptPayPayment(paymentId, ticket.getTicketId(), serverAmount, "0812345678");
+            case CREDIT_CARD -> payment = new CreditCardPayment(paymentId, ticket.getTicketId(), serverAmount,
                         cardNumber != null ? cardNumber : "4111222233334444",
                         cardHolder != null ? cardHolder : "VALUED CUSTOMER");
-                break;
-            case CASH:
-                double tendered = (cashTendered != null && cashTendered >= amount) ? cashTendered : amount;
-                payment = new CashPayment(paymentId, ticket.getTicketId(), amount, tendered);
-                break;
-            default:
-                throw new IllegalArgumentException("ช่องทางการชำระเงินไม่ถูกต้อง");
+            case CASH -> {
+                double tendered = (cashTendered != null && cashTendered >= serverAmount) ? cashTendered : serverAmount;
+                payment = new CashPayment(paymentId, ticket.getTicketId(), serverAmount, tendered);
+            }
+            default -> throw new IllegalArgumentException("ช่องทางการชำระเงินไม่ถูกต้อง");
         }
 
         boolean success = payment.processPayment();
@@ -219,7 +279,7 @@ public class ParkingService {
         }
 
         paymentRepository.save(payment);
-        ticket.markPaid(amount, payment.getPaymentId(), this.simulatedTime);
+        ticket.markPaid(serverAmount, payment.getPaymentId(), this.simulatedTime);
         ticketRepository.save(ticket);
 
         Map<String, Object> receipt = new HashMap<>();
@@ -232,9 +292,9 @@ public class ParkingService {
         receipt.put("methodLabel", payment.getMethod().getLabel());
         receipt.put("transactionRef", payment.getTransactionRef());
         receipt.put("paymentTime", payment.getPaymentTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-        if (payment instanceof CashPayment) {
-            receipt.put("cashTendered", ((CashPayment) payment).getCashTendered());
-            receipt.put("change", ((CashPayment) payment).getChange());
+        if (payment instanceof CashPayment cashPayment) {
+            receipt.put("cashTendered", cashPayment.getCashTendered());
+            receipt.put("change", cashPayment.getChange());
         }
         return receipt;
     }
@@ -269,9 +329,21 @@ public class ParkingService {
      */
     public synchronized Map<String, Object> markTicketLost(String ticketIdOrPlate) {
         Ticket ticket = findTicket(ticketIdOrPlate);
-        ticket.markLost(300.0);
+        double parkingFee = calculateParkingFee(ticket, ticket.calculateDuration(this.simulatedTime));
+        ticket.markLost(LOST_TICKET_PENALTY + parkingFee);
         ticketRepository.save(ticket);
         return calculateFee(ticket.getTicketId());
+    }
+
+    private double calculateParkingFee(Ticket ticket, Duration duration) {
+        if (membershipRepository.findValidByPlate(ticket.getLicensePlate(), simulatedTime.toLocalDate()).isPresent()) {
+            return 0.0;
+        }
+
+        Optional<Slot> slotOpt = parkingLot.findSlot(ticket.getSlotNumber());
+        Vehicle vehicle = slotOpt.flatMap(s -> Optional.ofNullable(s.getCurrentVehicle()))
+                .orElseGet(() -> VehicleFactory.createVehicle(ticket.getVehicleType(), ticket.getLicensePlate(), false));
+        return vehicle.getPricingStrategy().calculateFee(duration, vehicle);
     }
 
     /**
@@ -313,6 +385,81 @@ public class ParkingService {
      */
     public PaymentRepository getPaymentRepository() {
         return paymentRepository;
+    }
+
+    public ReservationRepository getReservationRepository() { return reservationRepository; }
+    public MembershipRepository getMembershipRepository() { return membershipRepository; }
+
+    public synchronized Map<String, Object> createReservation(String licensePlate, VehicleType type,
+                                                               boolean requiresCharging, LocalDateTime startTime,
+                                                               LocalDateTime endTime) {
+        if (reservationRepository.findActiveByPlate(licensePlate).isPresent()) {
+            throw new IllegalStateException("ทะเบียนนี้มีการจองที่ยังใช้งานอยู่แล้ว");
+        }
+        String id = "RSV-" + (reservationRepository.findAll().size() + 1);
+        Reservation reservation = new Reservation(id, licensePlate, type, requiresCharging, startTime, endTime);
+        reservationRepository.save(reservation);
+        return reservationMap(reservation);
+    }
+
+    public synchronized Map<String, Object> cancelReservation(String reservationId) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new IllegalArgumentException("ไม่พบรายการจอง " + reservationId));
+        reservation.cancel();
+        reservationRepository.save(reservation);
+        return reservationMap(reservation);
+    }
+
+    public synchronized Map<String, Object> createMembership(String memberId, String memberName,
+                                                              String licensePlate, MembershipType membershipType,
+                                                              LocalDate validFrom,
+                                                              LocalDate validUntil) {
+        Membership membership = new Membership(memberId, memberName, licensePlate, membershipType, validFrom, validUntil);
+        membershipRepository.save(membership);
+        Map<String, Object> result = new HashMap<>();
+        result.put("memberId", membership.getMemberId());
+        result.put("memberName", membership.getMemberName());
+        result.put("licensePlate", membership.getLicensePlate());
+        result.put("membershipType", membership.getMembershipType().name());
+        result.put("membershipTypeDisplay", membership.getMembershipType().getDisplayName());
+        result.put("validFrom", membership.getValidFrom().toString());
+        result.put("validUntil", membership.getValidUntil().toString());
+        return result;
+    }
+
+    public synchronized Map<String, Object> getDailyDashboard(LocalDate date) {
+        double revenue = paymentRepository.findAll().stream()
+                .filter(p -> p.getPaymentTime().toLocalDate().equals(date))
+                .mapToDouble(p -> p.getAmount()).sum();
+        long paidTickets = ticketRepository.findAll().stream()
+                .filter(t -> t.getStatus() == TicketStatus.PAID || t.getStatus() == TicketStatus.EXITED)
+                .count();
+        Map<String, Object> result = new HashMap<>();
+        result.put("date", date.toString());
+        result.put("revenue", revenue);
+        result.put("paidTickets", paidTickets);
+        result.put("occupancyRate", parkingLot.getTotalCapacity() == 0 ? 0 :
+                Math.round((double) parkingLot.getTotalOccupied() * 100 / parkingLot.getTotalCapacity()));
+        result.put("totalCapacity", parkingLot.getTotalCapacity());
+        result.put("occupiedSlots", parkingLot.getTotalOccupied());
+        result.put("availableSlots", parkingLot.getTotalAvailable());
+        result.put("reservationCount", reservationRepository.findAll().stream()
+                .filter(r -> r.getStartTime().toLocalDate().equals(date)).count());
+        result.put("activeMembers", membershipRepository.findAll().stream().filter(m -> m.isValidOn(date)).count());
+        return result;
+    }
+
+    private Map<String, Object> reservationMap(Reservation reservation) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("reservationId", reservation.getReservationId());
+        result.put("licensePlate", reservation.getLicensePlate());
+        result.put("vehicleType", reservation.getVehicleType().name());
+        result.put("requiresCharging", reservation.isRequiresCharging());
+        result.put("startTime", reservation.getStartTime().toString());
+        result.put("endTime", reservation.getEndTime().toString());
+        result.put("cancelled", reservation.isCancelled());
+        result.put("checkedIn", reservation.isCheckedIn());
+        return result;
     }
 
     /**

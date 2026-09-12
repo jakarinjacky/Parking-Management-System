@@ -13,6 +13,6 @@ public class Motorcycle extends Vehicle {
     @Override
     public boolean canParkIn(Slot slot) {
         SlotType type = slot.getSlotType();
-        return type == SlotType.MOTORCYCLE || type == SlotType.COMPACT;
+        return type == SlotType.MOTORCYCLE || type == SlotType.COMPACT || type == SlotType.VIP;
     }
 }

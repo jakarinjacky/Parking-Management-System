@@ -22,6 +22,6 @@ public class ElectricVehicle extends Vehicle {
         if (requiresCharging) {
             return type == SlotType.EV_CHARGING;
         }
-        return type == SlotType.EV_CHARGING || type == SlotType.STANDARD || type == SlotType.LARGE;
+        return type == SlotType.EV_CHARGING || type == SlotType.STANDARD || type == SlotType.LARGE || type == SlotType.VIP;
     }
 }

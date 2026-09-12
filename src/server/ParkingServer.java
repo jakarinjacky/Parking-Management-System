@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import domain.ai.AIRecommendation;
+import domain.enums.MembershipType;
 import domain.enums.PaymentMethod;
 import domain.enums.SlotType;
 import domain.enums.VehicleType;
@@ -24,13 +25,19 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import repository.MembershipRepository;
 import repository.PaymentRepository;
+import repository.ReservationRepository;
 import repository.TicketRepository;
 import service.ParkingService;
 import util.SimpleJson;
@@ -46,6 +53,39 @@ public class ParkingServer {
     private final ParkingService parkingService; // Business Logic Service หลักของระบบ
     private final HttpServer server; // อินสแตนซ์ของ HTTP Server
     private final Path webRoot; // โฟลเดอร์ต้นทางสำหรับเก็บไฟล์ Frontend
+    private final Map<String, EmployeeSession> activeSessions = new ConcurrentHashMap<>();
+
+    private static final Map<String, EmployeeAccount> SYSTEM_USERS = new HashMap<>();
+    static {
+        SYSTEM_USERS.put("admin", new EmployeeAccount("admin", "admin123", "admin", "ผู้ดูแลระบบ"));
+        SYSTEM_USERS.put("staff01", new EmployeeAccount("staff01", "staff123", "staff", "พนักงานจุดเข้า-ออกรถ 1"));
+        SYSTEM_USERS.put("staff02", new EmployeeAccount("staff02", "staff123", "staff", "พนักงานจุดเข้า-ออกรถ 2"));
+        SYSTEM_USERS.put("staff03", new EmployeeAccount("staff03", "staff123", "staff", "พนักงานชำระเงิน / ทางออก"));
+    }
+
+    private static class EmployeeAccount {
+        private final String username;
+        private final String password;
+        private final String role;
+        private final String displayName;
+
+        private EmployeeAccount(String username, String password, String role, String displayName) {
+            this.username = username;
+            this.password = password;
+            this.role = role;
+            this.displayName = displayName;
+        }
+    }
+
+    private static class EmployeeSession {
+        private final EmployeeAccount account;
+        private final LocalDateTime loginTime;
+
+        private EmployeeSession(EmployeeAccount account) {
+            this.account = account;
+            this.loginTime = LocalDateTime.now();
+        }
+    }
 
     /**
      * Constructor สำหรับเริ่มต้นสร้างเซิร์ฟเวอร์
@@ -67,27 +107,101 @@ public class ParkingServer {
      * กำหนดและลงทะเบียน Endpoints/URL Contexts ทั้งหมดที่เซิร์ฟเวอร์เปิดให้บริการ
      */
     private void registerRoutes() {
+        server.createContext("/api/login", new ApiLoginHandler());
+        server.createContext("/api/logout", new ApiLogoutHandler());
+        server.createContext("/api/session", new ApiSessionHandler());
+
         // --- ส่วนของ API Endpoints ---
-        server.createContext("/api/status", new ApiStatusHandler());            // ข้อมูลสถานะภาพรวมของลานจอดรถ
-        server.createContext("/api/lot", new ApiLotHandler());                  // ข้อมูลผังลานจอดรถและสถานะแต่ละช่อง
-        server.createContext("/api/park", new ApiParkHandler());                // การนำรถเข้าจอด (Check-in)
-        server.createContext("/api/calculate-fee", new ApiCalculateFeeHandler()); // คำนวณค่าบริการที่จอดรถ
-        server.createContext("/api/pay", new ApiPayHandler());                  // ชำระเงินค่าบริการ
-        server.createContext("/api/exit", new ApiExitHandler());                // การนำรถออกจากลานจอด (Check-out)
-        server.createContext("/api/lost-ticket", new ApiLostTicketHandler());   // จัดการกรณีตั๋วจอดรถสูญหาย
-        server.createContext("/api/time-travel", new ApiTimeTravelHandler());   // จำลองเวลา (ข้ามเวลา/รีเซ็ตเวลา)
-        server.createContext("/api/tickets", new ApiTicketsHandler());          // ดึงรายการตั๋วทั้งหมดในระบบ
-        server.createContext("/api/payments", new ApiPaymentsHandler());        // ดึงรายการประวัติการชำระเงินทั้งหมด
+        registerProtectedRoute("/api/status", new ApiStatusHandler());
+        registerProtectedRoute("/api/lot", new ApiLotHandler());
+        registerProtectedRoute("/api/park", new ApiParkHandler());
+        registerProtectedRoute("/api/calculate-fee", new ApiCalculateFeeHandler());
+        registerProtectedRoute("/api/pay", new ApiPayHandler());
+        registerProtectedRoute("/api/exit", new ApiExitHandler());
+        registerProtectedRoute("/api/lost-ticket", new ApiLostTicketHandler());
+        registerProtectedRoute("/api/time-travel", new ApiTimeTravelHandler());
+        registerProtectedRoute("/api/tickets", new ApiTicketsHandler());
+        registerProtectedRoute("/api/payments", new ApiPaymentsHandler());
+        registerProtectedRoute("/api/reservations", new ApiReservationHandler());
+        registerProtectedRoute("/api/memberships", new ApiMembershipHandler());
+        registerProtectedRoute("/api/dashboard/daily", new ApiDailyDashboardHandler());
 
         // --- ส่วนของ AI Services & Explainable AI (XAI) Endpoints ---
-        server.createContext("/api/ai/recommend", new ApiAiRecommendHandler());  // จัดสรรและแนะนำช่องจอดด้วย AI พร้อมคำอธิบาย
-        server.createContext("/api/ai/anpr", new ApiAiAnprHandler());            // สแกนป้ายทะเบียนและจำแนกประเภทรถ (AI Vision / ANPR)
-        server.createContext("/api/ai/predict", new ApiAiPredictHandler());      // พยากรณ์ความหนาแน่นและราคา (Dynamic Pricing)
-        server.createContext("/api/ai/insights", new ApiAiInsightsHandler());    // บทวิเคราะห์และข้อเสนอแนะเชิงบริหารสำหรับผู้บริหาร
-        server.createContext("/api/ai/chat", new ApiAiChatHandler());            // AI Copilot Interactive Chatbot
+        registerProtectedRoute("/api/ai/recommend", new ApiAiRecommendHandler());
+        registerProtectedRoute("/api/ai/anpr", new ApiAiAnprHandler());
+        registerProtectedRoute("/api/ai/anpr-entry", new ApiAiAnprEntryHandler());
+        registerProtectedRoute("/api/ai/predict", new ApiAiPredictHandler());
+        registerProtectedRoute("/api/ai/insights", new ApiAiInsightsHandler());
+        registerProtectedRoute("/api/ai/chat", new ApiAiChatHandler());
 
         // --- ส่วนของ Static Web Files Handler (Frontend) ---
         server.createContext("/", new StaticFileHandler());
+    }
+
+    private void registerProtectedRoute(String path, HttpHandler handler) {
+        server.createContext(path, exchange -> {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendCors(exchange);
+                return;
+            }
+
+            if (!isAuthenticated(exchange)) {
+                sendUnauthorized(exchange);
+                return;
+            }
+
+            handler.handle(exchange);
+        });
+    }
+
+    private boolean isAuthenticated(HttpExchange exchange) {
+        String token = getCookieValue(exchange, "parking_session_token");
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        EmployeeSession session = activeSessions.get(token);
+        return session != null;
+    }
+
+    private EmployeeSession getSession(HttpExchange exchange) {
+        String token = getCookieValue(exchange, "parking_session_token");
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        return activeSessions.get(token);
+    }
+
+    private static String getCookieValue(HttpExchange exchange, String name) {
+        List<String> cookies = exchange.getRequestHeaders().get("Cookie");
+        if (cookies == null) {
+            return null;
+        }
+
+        for (String cookieHeader : cookies) {
+            String[] parts = cookieHeader.split(";");
+            for (String part : parts) {
+                String trimmed = part.trim();
+                if (trimmed.startsWith(name + "=")) {
+                    return trimmed.substring(name.length() + 1);
+                }
+            }
+        }
+        return null;
+    }
+
+    private static void setCookie(HttpExchange exchange, String name, String value, int maxAgeSeconds) {
+        String cookie = name + "=" + value + "; Path=/; HttpOnly; SameSite=Lax";
+        if (maxAgeSeconds >= 0) {
+            cookie += "; Max-Age=" + maxAgeSeconds;
+        }
+        exchange.getResponseHeaders().add("Set-Cookie", cookie);
+    }
+
+    private void sendUnauthorized(HttpExchange exchange) throws IOException {
+        sendJsonResponse(exchange, 401, Map.of(
+                "error", "กรุณาเข้าสู่ระบบก่อนใช้งาน",
+                "requiresLogin", true
+        ));
     }
 
     /**
@@ -99,6 +213,10 @@ public class ParkingServer {
         System.out.println("=================================================");
         System.out.println("  Smart Parking Management System Server Started ");
         System.out.println("  URL: http://localhost:" + PORT);
+        System.out.println("  Login accounts:");
+        for (Map.Entry<String, EmployeeAccount> entry : SYSTEM_USERS.entrySet()) {
+            System.out.println("    - " + entry.getKey() + " / " + entry.getValue().password + " (" + entry.getValue().displayName + ")");
+        }
         System.out.println("=================================================");
     }
 
@@ -107,6 +225,100 @@ public class ParkingServer {
      */
     public void stop() {
         server.stop(1);
+    }
+
+    private class ApiLoginHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendCors(exchange);
+                return;
+            }
+
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
+                return;
+            }
+
+            try {
+                String body = readRequestBody(exchange);
+                Map<String, String> req = SimpleJson.parseSimpleJson(body);
+                String username = req.get("username");
+                String password = req.get("password");
+
+                if (username == null || password == null) {
+                    sendJsonResponse(exchange, 400, Map.of("error", "กรุณาระบุชื่อผู้ใช้และรหัสผ่าน"));
+                    return;
+                }
+
+                EmployeeAccount account = SYSTEM_USERS.get(username.trim().toLowerCase());
+                if (account == null || !account.password.equals(password.trim())) {
+                    sendJsonResponse(exchange, 401, Map.of("error", "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"));
+                    return;
+                }
+
+                String token = UUID.randomUUID().toString();
+                EmployeeSession session = new EmployeeSession(account);
+                activeSessions.put(token, session);
+                setCookie(exchange, "parking_session_token", token, 60 * 60 * 8);
+                System.out.println("[LOGIN] " + account.displayName + " (" + account.role + ") logged in from " + exchange.getRemoteAddress());
+
+                Map<String, Object> resp = new HashMap<>();
+                resp.put("success", true);
+                resp.put("message", "เข้าสู่ระบบสำเร็จ");
+                resp.put("username", account.username);
+                resp.put("displayName", account.displayName);
+                resp.put("role", account.role);
+                resp.put("roleLabel", "admin".equals(account.role) ? "Admin" : "Staff");
+                resp.put("loginTime", session.loginTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                resp.put("token", token);
+                sendJsonResponse(exchange, 200, resp);
+            } catch (Exception ex) {
+                sendJsonResponse(exchange, 500, Map.of("error", ex.getMessage()));
+            }
+        }
+    }
+
+    private class ApiSessionHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendCors(exchange);
+                return;
+            }
+
+            EmployeeSession session = getSession(exchange);
+            if (session == null) {
+                sendJsonResponse(exchange, 401, Map.of("error", "Session expired", "requiresLogin", true));
+                return;
+            }
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("authenticated", true);
+            resp.put("username", session.account.username);
+            resp.put("displayName", session.account.displayName);
+            resp.put("role", session.account.role);
+            resp.put("roleLabel", "admin".equals(session.account.role) ? "Admin" : "Staff");
+            resp.put("loginTime", session.loginTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            sendJsonResponse(exchange, 200, resp);
+        }
+    }
+
+    private class ApiLogoutHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendCors(exchange);
+                return;
+            }
+
+            String token = getCookieValue(exchange, "parking_session_token");
+            if (token != null) {
+                activeSessions.remove(token);
+            }
+            setCookie(exchange, "parking_session_token", "", 0);
+            sendJsonResponse(exchange, 200, Map.of("success", true, "message", "ออกจากระบบสำเร็จ"));
+        }
     }
 
     // =========================================================================
@@ -159,6 +371,80 @@ public class ParkingServer {
 
             // ส่งข้อมูลกลับในรูปแบบ JSON พร้อม Status 200 OK
             sendJsonResponse(exchange, 200, data);
+        }
+    }
+
+    private class ApiReservationHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) { sendCors(exchange); return; }
+            try {
+                if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    List<Map<String, Object>> reservations = new ArrayList<>();
+                    for (var reservation : parkingService.getReservationRepository().findAll()) {
+                        Map<String, Object> item = new HashMap<>();
+                        item.put("reservationId", reservation.getReservationId());
+                        item.put("licensePlate", reservation.getLicensePlate());
+                        item.put("vehicleType", reservation.getVehicleType().name());
+                        item.put("startTime", reservation.getStartTime().toString());
+                        item.put("endTime", reservation.getEndTime().toString());
+                        item.put("cancelled", reservation.isCancelled());
+                        item.put("checkedIn", reservation.isCheckedIn());
+                        reservations.add(item);
+                    }
+                    sendJsonResponse(exchange, 200, reservations);
+                    return;
+                }
+                if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) { sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed")); return; }
+                Map<String, String> req = SimpleJson.parseSimpleJson(readRequestBody(exchange));
+                Map<String, Object> result = parkingService.createReservation(
+                        req.get("licensePlate"), VehicleType.valueOf(req.get("vehicleType").toUpperCase()),
+                        "true".equalsIgnoreCase(req.get("requiresCharging")),
+                        LocalDateTime.parse(req.get("startTime")), LocalDateTime.parse(req.get("endTime")));
+                sendJsonResponse(exchange, 201, result);
+            } catch (IllegalArgumentException | IllegalStateException ex) { sendJsonResponse(exchange, 400, Map.of("error", ex.getMessage())); }
+        }
+    }
+
+    private class ApiMembershipHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) { sendCors(exchange); return; }
+            try {
+                if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    List<Map<String, Object>> members = new ArrayList<>();
+                    for (var member : parkingService.getMembershipRepository().findAll()) {
+                        Map<String, Object> item = new HashMap<>();
+                        item.put("memberId", member.getMemberId()); item.put("memberName", member.getMemberName());
+                        item.put("licensePlate", member.getLicensePlate()); item.put("validFrom", member.getValidFrom().toString());
+                        item.put("validUntil", member.getValidUntil().toString());
+                        item.put("membershipType", member.getMembershipType().name());
+                        item.put("membershipTypeDisplay", member.getMembershipType().getDisplayName()); members.add(item);
+                    }
+                    sendJsonResponse(exchange, 200, members); return;
+                }
+                if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) { sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed")); return; }
+                Map<String, String> req = SimpleJson.parseSimpleJson(readRequestBody(exchange));
+                String membershipTypeValue = req.get("membershipType");
+                MembershipType membershipType = membershipTypeValue == null || membershipTypeValue.isBlank()
+                    ? MembershipType.STANDARD_MEMBER
+                    : MembershipType.valueOf(membershipTypeValue.trim().toUpperCase());
+                sendJsonResponse(exchange, 201, parkingService.createMembership(req.get("memberId"), req.get("memberName"),
+                    req.get("licensePlate"), membershipType, LocalDate.parse(req.get("validFrom")), LocalDate.parse(req.get("validUntil"))));
+            } catch (IllegalArgumentException ex) { sendJsonResponse(exchange, 400, Map.of("error", ex.getMessage())); }
+        }
+    }
+
+    private class ApiDailyDashboardHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) { sendCors(exchange); return; }
+            try {
+                String query = exchange.getRequestURI().getQuery();
+                LocalDate date = LocalDate.now();
+                if (query != null && query.startsWith("date=")) date = LocalDate.parse(query.substring(5));
+                sendJsonResponse(exchange, 200, parkingService.getDailyDashboard(date));
+            } catch (IllegalArgumentException ex) { sendJsonResponse(exchange, 400, Map.of("error", ex.getMessage())); }
         }
     }
 
@@ -345,15 +631,13 @@ public class ParkingServer {
 
                 String ticketId = req.get("ticketId");
                 String methodStr = req.get("method");
-                String amountStr = req.get("amount");
 
-                if (ticketId == null || methodStr == null || amountStr == null) {
+                if (ticketId == null || methodStr == null) {
                     sendJsonResponse(exchange, 400, Map.of("error", "ข้อมูลไม่ครบถ้วน"));
                     return;
                 }
 
                 PaymentMethod method = PaymentMethod.valueOf(methodStr.trim().toUpperCase());
-                double amount = Double.parseDouble(amountStr);
 
                 // ดึงข้อมูลเพิ่มเติมตามวิธีชำระเงิน (เช่น เงินที่รับมา หรือข้อมูลบัตร)
                 Double cashTendered = req.containsKey("cashTendered") ? Double.parseDouble(req.get("cashTendered")) : null;
@@ -362,7 +646,7 @@ public class ParkingServer {
 
                 // บันทึกและประมวลผลการชำระเงินผ่าน Service
                 Map<String, Object> receipt = parkingService.processPayment(
-                        ticketId, method, amount, cashTendered, cardNumber, cardHolder
+                    ticketId, method, cashTendered, cardNumber, cardHolder
                 );
                 sendJsonResponse(exchange, 200, receipt);
 
@@ -616,6 +900,56 @@ public class ParkingServer {
     }
 
     /**
+     * Handler: POST /api/ai/anpr-entry
+     * ตรวจทะเบียนจากกล้องและเปิดไม้กั้นอัตโนมัติเฉพาะสมาชิกที่ยังมีสิทธิ์ใช้งาน
+     */
+    private class ApiAiAnprEntryHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendCors(exchange);
+                return;
+            }
+
+            try {
+                String body = readRequestBody(exchange);
+                Map<String, String> req = SimpleJson.parseSimpleJson(body);
+                Map<String, Object> scan = parkingService.getAIParkingService().simulateANPR(req.get("licensePlate"));
+                String plate = (String) scan.get("detectedPlate");
+                Optional<domain.model.Membership> member = parkingService.getMembershipRepository()
+                        .findValidByPlate(plate, parkingService.getCurrentTime().toLocalDate());
+
+                Map<String, Object> response = new HashMap<>(scan);
+                response.put("membershipMatched", member.isPresent());
+                response.put("autoEntry", false);
+
+                if (member.isPresent()) {
+                    VehicleType type = VehicleType.valueOf((String) scan.get("detectedType"));
+                    Map<String, Object> ticket = parkingService.checkIn(
+                            type, plate, Boolean.TRUE.equals(scan.get("requiresCharging")));
+                    response.put("autoEntry", true);
+                    response.put("memberId", member.get().getMemberId());
+                    response.put("memberName", member.get().getMemberName());
+                    response.put("membershipType", member.get().getMembershipType().name());
+                    response.put("membershipTypeDisplay", member.get().getMembershipType().getDisplayName());
+                    response.put("membershipValidUntil", member.get().getValidUntil().toString());
+                    response.put("ticket", ticket);
+                    response.put("gateAction", "OPEN_ENTRY_GATE");
+                } else {
+                    response.put("gateAction", "MANUAL_CONFIRMATION_REQUIRED");
+                    response.put("message", "ไม่พบสมาชิกที่ยังใช้งานได้ กรุณาตรวจสอบข้อมูลและกดยืนยันเข้าจอด");
+                }
+
+                sendJsonResponse(exchange, 200, response);
+            } catch (IllegalArgumentException | IllegalStateException ex) {
+                sendJsonResponse(exchange, 400, Map.of("error", ex.getMessage()));
+            } catch (Exception ex) {
+                sendJsonResponse(exchange, 500, Map.of("error", ex.getMessage()));
+            }
+        }
+    }
+
+    /**
      * Handler: GET /api/ai/predict
      * พยากรณ์อัตราความหนาแน่นและการปรับราคาแบบ Dynamic Pricing
      */
@@ -705,7 +1039,21 @@ public class ParkingServer {
         public void handle(HttpExchange exchange) throws IOException {
             String path = exchange.getRequestURI().getPath();
             if (path == null || path.equals("/") || path.isEmpty()) {
+                if (!isAuthenticated(exchange)) {
+                    redirectToLogin(exchange);
+                    return;
+                }
                 path = "/index.html";
+            }
+
+            if ("/login.html".equals(path) && isAuthenticated(exchange)) {
+                redirectToRoot(exchange);
+                return;
+            }
+
+            if ("/index.html".equals(path) && !isAuthenticated(exchange)) {
+                redirectToLogin(exchange);
+                return;
             }
 
             // ตรวจสอบความปลอดภัย ป้องกัน Path Traversal Attack
@@ -736,6 +1084,16 @@ public class ParkingServer {
         }
     }
 
+    private static void redirectToLogin(HttpExchange exchange) throws IOException {
+        exchange.getResponseHeaders().set("Location", "/login.html");
+        exchange.sendResponseHeaders(302, -1);
+    }
+
+    private static void redirectToRoot(HttpExchange exchange) throws IOException {
+        exchange.getResponseHeaders().set("Location", "/");
+        exchange.sendResponseHeaders(302, -1);
+    }
+
     /**
      * วิเคราะห์และกำหนด MIME Content-Type ตามนามสกุลไฟล์
      * @param fileName ชื่อไฟล์ที่ต้องการตรวจสอบ
@@ -759,7 +1117,8 @@ public class ParkingServer {
      * @throws IOException หากเกิดข้อผิดพลาดในการส่ง Response Headers
      */
     private static void sendCors(HttpExchange exchange) throws IOException {
-        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", allowedOrigin(exchange));
+        exchange.getResponseHeaders().set("Access-Control-Allow-Credentials", "true");
         exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
         exchange.sendResponseHeaders(204, -1);
@@ -776,11 +1135,19 @@ public class ParkingServer {
         String json = SimpleJson.toJson(data);
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", allowedOrigin(exchange));
+        exchange.getResponseHeaders().set("Access-Control-Allow-Credentials", "true");
         exchange.sendResponseHeaders(statusCode, bytes.length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(bytes);
         }
+    }
+
+    private static String allowedOrigin(HttpExchange exchange) {
+        String origin = exchange.getRequestHeaders().getFirst("Origin");
+        if (origin == null || origin.isBlank()) return "http://localhost:8080";
+        if (origin.matches("https?://(localhost|127\\.0\\.0\\.1)(:\\d+)?")) return origin;
+        return "http://localhost:8080";
     }
 
     /**
@@ -828,6 +1195,7 @@ public class ParkingServer {
         f1.addSlot(SlotFactory.createSlot("F1-06", 1, SlotType.STANDARD));
         f1.addSlot(SlotFactory.createSlot("F1-07", 1, SlotType.STANDARD));
         f1.addSlot(SlotFactory.createSlot("F1-08", 1, SlotType.COMPACT));
+        f1.addSlot(SlotFactory.createSlot("F1-VIP", 1, SlotType.VIP));
         lot.addFloor(f1);
 
         // ชั้นที่ 2: สำหรับรถเก๋งทั่วไปและรถขนาดกะทัดรัด (Compact Cars)
@@ -855,12 +1223,15 @@ public class ParkingServer {
         // 2. สร้างที่จัดเก็บข้อมูลจำลอง (Repositories) และ Service
         TicketRepository ticketRepo = new TicketRepository();
         PaymentRepository paymentRepo = new PaymentRepository();
+        Path dataDir = Paths.get("data").toAbsolutePath();
+        MembershipRepository membershipRepo = new MembershipRepository(dataDir.resolve("memberships.db"));
+        ReservationRepository reservationRepo = new ReservationRepository(dataDir.resolve("reservations.db"));
         DisplayBoard displayBoard = new DisplayBoard("BOARD-MAIN-GATE");
 
-        ParkingService service = new ParkingService(lot, ticketRepo, paymentRepo, displayBoard);
+        ParkingService service = new ParkingService(lot, ticketRepo, paymentRepo, displayBoard, reservationRepo, membershipRepo);
 
         // 3. จำลองการจอดรถล่วงหน้าเพื่อให้มีข้อมูลในระบบพร้อมทดสอบ
-        seedDemoData(service, lot, ticketRepo);
+        seedDemoData(service);
 
         // 4. สตาร์ตเซิร์ฟเวอร์
         Path webDir = Paths.get("web").toAbsolutePath();
@@ -871,11 +1242,9 @@ public class ParkingServer {
     /**
      * ฟังก์ชันสำหรับใส่ข้อมูลจำลอง (Seed Demo Data)
      * จำลองเหตุการณ์รถเข้าจอดในช่วงเวลาต่าง ๆ เพื่อให้ระบบมีข้อมูลทดสอบที่สมจริง
-     * @param service เซอร์วิสระบบที่จอดรถ
-     * @param lot อ็อบเจกต์ลานจอดรถ
-     * @param ticketRepo ตัวจัดการข้อมูลตั๋ว
+     * @param service เซอร์วิสระบบที่ดูแลที่จอดรถ
      */
-    private static void seedDemoData(ParkingService service, ParkingLot lot, TicketRepository ticketRepo) {
+    private static void seedDemoData(ParkingService service) {
         try {
             // รถคันที่ 1: Tesla Model Y (EV) เข้าจอด 2 ชั่วโมงที่แล้ว
             service.fastForwardMinutes(-120);

@@ -388,7 +388,7 @@ public class AIParkingService {
                     + "2. มอเตอร์ไซค์ (Motorcycle): ฟรี 30 นาทีแรก, 10฿/ชม.\n"
                     + "3. รถยนต์ไฟฟ้า (EV): 40฿/ชม. (รวมค่าชาร์จ)\n"
                     + "4. รถบรรทุก (Truck): 50฿/ชม.\n"
-                    + "💡 ตั๋วหายคิดค่าปรับเหมาจ่าย 300 บาท";
+                    + "💡 ตั๋วหายคิดค่าจอดตามเวลาจริงรวมค่าปรับ 300 บาท";
         } else if (q.contains("oop") || q.contains("solid") || q.contains("สถาปัตยกรรม") || q.contains("โครงสร้าง")) {
             category = "OOP_ARCHITECTURE";
             answer = "ระบบนี้ออกแบบด้วยเสาหลัก OOP 4 ประการ และ Design Patterns อย่างเคร่งครัด:\n"

@@ -936,6 +936,7 @@
             <li><a href="#overview" class="active">ภาพรวม</a></li>
             <li><a href="#architecture">สถาปัตยกรรม</a></li>
             <li><a href="#workflow">การทำงาน</a></li>
+            <li><a href="#business-features">ฟีเจอร์ธุรกิจ</a></li>
             <li><a href="#ai-features">ระบบ AI</a></li>
             <li><a href="#devices">อุปกรณ์</a></li>
             <li><a href="#oop">OOP & Patterns</a></li>
@@ -1044,12 +1045,12 @@
                 <div class="arch-arrow">⬇ HTTP REST API (JSON) ⬇</div>
                 <div class="arch-layer layer-server">
                     <div class="arch-layer-name">🌐 Server Layer (ParkingServer.java)</div>
-                    <div class="arch-layer-desc">Pure Java SE HttpServer — ลงทะเบียน 15 API Endpoints, Static File Server, CORS</div>
+                    <div class="arch-layer-desc">Pure Java SE HttpServer — API สำหรับ Core, Reservation, Membership, Dashboard และ AI พร้อม Static File Server, CORS</div>
                 </div>
                 <div class="arch-arrow">⬇ ⬇</div>
                 <div class="arch-layer layer-service">
                     <div class="arch-layer-name">⚙️ Service Layer / Facade (ParkingService.java)</div>
-                    <div class="arch-layer-desc">Business Workflow Controller: Check-in, Check-out, Payment, Time Simulation</div>
+                    <div class="arch-layer-desc">Business Workflow Controller: Check-in, Reservation, Membership, Check-out, Payment, Dashboard และ Time Simulation</div>
                 </div>
                 <div class="arch-arrow">⬇ ⬇</div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
@@ -1059,13 +1060,13 @@
                     </div>
                     <div class="arch-layer layer-domain">
                         <div class="arch-layer-name">🏛️ Domain Layer (Models, Strategies, Factories)</div>
-                        <div class="arch-layer-desc">Vehicle, Slot, Ticket, ParkingLot, PricingStrategy, Observer</div>
+                        <div class="arch-layer-desc">Vehicle, Slot, Ticket, Reservation, Membership, ParkingLot, PricingStrategy, Observer</div>
                     </div>
                 </div>
                 <div class="arch-arrow">⬇ ⬇</div>
                 <div class="arch-layer layer-repo">
                     <div class="arch-layer-name">💾 Repository Layer (In-Memory Storage)</div>
-                    <div class="arch-layer-desc">TicketRepository + PaymentRepository — ข้อมูลเก็บใน ConcurrentHashMap</div>
+                    <div class="arch-layer-desc">TicketRepository + PaymentRepository + ReservationRepository + MembershipRepository — ข้อมูลเก็บใน ConcurrentHashMap</div>
                 </div>
             </div>
         </div>
@@ -1087,7 +1088,8 @@
 │   │   │   ├── <span class="java">SlotStatus.java</span>           <span class="comment"># AVAILABLE, OCCUPIED, RESERVED, MAINTENANCE</span>
 │   │   │   ├── <span class="java">TicketStatus.java</span>         <span class="comment"># ACTIVE, PAID, EXITED, LOST</span>
 │   │   │   ├── <span class="java">PaymentStatus.java</span>        <span class="comment"># PENDING, SUCCESS, FAILED</span>
-│   │   │   └── <span class="java">PaymentMethod.java</span>        <span class="comment"># PROMPTPAY, CREDIT_CARD, CASH</span>
+│   │   │   ├── <span class="java">PaymentMethod.java</span>        <span class="comment"># PROMPTPAY, CREDIT_CARD, CASH</span>
+│   │   │   └── <span class="java">MembershipType.java</span>         <span class="comment"># STANDARD_MEMBER, VIP_MEMBER, EV_MEMBER</span>
 │   │   ├── <span class="dir">model/</span>
 │   │   │   ├── <span class="java">Vehicle.java</span>              <span class="comment"># Abstract Base Class สำหรับยานพาหนะ</span>
 │   │   │   ├── <span class="java">Car.java</span>                  <span class="comment"># รถยนต์ส่วนบุคคล</span>
@@ -1097,7 +1099,9 @@
 │   │   │   ├── <span class="java">Slot.java</span>                 <span class="comment"># ช่องจอดรถ (Encapsulated State)</span>
 │   │   │   ├── <span class="java">ParkingFloor.java</span>         <span class="comment"># ชั้นจอดรถ</span>
 │   │   │   ├── <span class="java">ParkingLot.java</span>           <span class="comment"># Aggregate Root + Observer</span>
-│   │   │   └── <span class="java">Ticket.java</span>               <span class="comment"># ตั๋วจอดรถ (State Machine)</span>
+│   │   │   ├── <span class="java">Ticket.java</span>               <span class="comment"># ตั๋วจอดรถ (State Machine)</span>
+│   │   │   ├── <span class="java">Reservation.java</span>          <span class="comment"># รายการจองล่วงหน้า</span>
+│   │   │   └── <span class="java">Membership.java</span>           <span class="comment"># บัตรสมาชิกรายเดือน</span>
 │   │   ├── <span class="dir">strategy/</span>
 │   │   │   ├── <span class="java">PricingStrategy.java</span>      <span class="comment"># Interface กลยุทธ์คิดราคา</span>
 │   │   │   ├── <span class="java">StandardPricingStrategy.java</span>
@@ -1119,7 +1123,9 @@
 │   │       └── <span class="java">CashPayment.java</span>
 │   ├── <span class="dir">repository/</span>
 │   │   ├── <span class="java">TicketRepository.java</span>
-│   │   └── <span class="java">PaymentRepository.java</span>
+│   │   ├── <span class="java">PaymentRepository.java</span>
+│   │   ├── <span class="java">ReservationRepository.java</span>
+│   │   └── <span class="java">MembershipRepository.java</span>
 │   ├── <span class="dir">service/</span>
 │   │   └── <span class="java">ParkingService.java</span>          <span class="comment"># Facade / Application Service</span>
 │   ├── <span class="dir">server/</span>
@@ -1200,7 +1206,7 @@
                     <div class="timeline-step">ขั้นตอนที่ 1 — Entry Gate (จุดตรวจทางเข้า)</div>
                     <div class="timeline-title">รถเข้าจอดและออกตั๋ว (Check-In)</div>
                     <div class="timeline-desc">
-                        ผู้ใช้ป้อนเลขทะเบียน (หรือให้ AI ANPR สแกนอัตโนมัติ) ➜ เลือกประเภทยานพาหนะ ➜ ระบบใช้ <strong>VehicleFactory</strong> สร้าง Object รถ ➜ <strong>ParkingLot (Aggregate Root)</strong> จัดสรรช่องจอดด้วย <strong>SlotAllocationStrategy</strong> ➜ สร้าง <strong>Ticket</strong> (สถานะ ACTIVE) ➜ แสดงแอนิเมชันไม้กั้นเปิด ➜ AI แนะนำช่องจอดที่ดีที่สุดพร้อมคำอธิบาย (XAI)
+                        ผู้ใช้ป้อนเลขทะเบียนหรือให้ AI ANPR สแกนอัตโนมัติ ➜ หากทะเบียนตรงกับสมาชิกที่ยัง valid ระบบจะตรวจสอบฝั่ง Server, สร้าง Ticket, จัดสรรช่อง และเปิดไม้กั้นอัตโนมัติ ➜ หากไม่ใช่สมาชิก ระบบจะเติมข้อมูลจากกล้องให้พนักงานตรวจและกดยืนยันเอง ➜ <strong>ParkingLot</strong> จัดสรรช่องด้วย <strong>SlotAllocationStrategy</strong> และ AI แนะนำช่องจอดพร้อมคำอธิบาย (XAI)
                     </div>
                 </div>
                 <div class="timeline-item">
@@ -1228,10 +1234,96 @@
                     <div class="timeline-step">ขั้นตอนที่ 5 — กรณีพิเศษ</div>
                     <div class="timeline-title">ตั๋วหาย (Lost Ticket)</div>
                     <div class="timeline-desc">
-                        หากผู้ใช้ทำตั๋วหาย ➜ กดปุ่ม "ตั๋วหาย" ➜ ระบบคิดค่าปรับเหมาจ่าย <strong>300 บาท</strong> ➜ ตั๋วเปลี่ยนสถานะเป็น LOST ➜ ชำระเงินและนำรถออก ➜ ระบบบันทึกประวัติไว้ครบถ้วน
+                        หากผู้ใช้ทำตั๋วหาย ➜ กดปุ่ม "ตั๋วหาย" ➜ ระบบคำนวณค่าจอดตามเวลาจริงแล้วบวกค่าปรับ <strong>300 บาท</strong> ➜ ตั๋วเปลี่ยนสถานะเป็น LOST ➜ ชำระเงินและนำรถออก ➜ ระบบบันทึกประวัติไว้ครบถ้วน
                     </div>
                 </div>
             </div>
+        </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION: ฟีเจอร์ธุรกิจเสริม -->
+    <!-- ============================================================ -->
+    <section class="section" id="business-features">
+        <div class="section-header reveal">
+            <div class="section-label">📅 Business Features</div>
+            <h2 class="section-title">ระบบจอง สมาชิกหลายประเภท และ Dashboard</h2>
+            <p class="section-desc">ฟีเจอร์เสริมที่ทำให้ระบบรองรับการใช้งานจริงมากขึ้น โดยใช้กฎธุรกิจจากฝั่ง Server เป็นหลัก</p>
+        </div>
+
+        <div class="grid-3 reveal">
+            <div class="card">
+                <div class="card-icon" style="background: rgba(59,130,246,0.12);">📅</div>
+                <div class="card-title">Reservation — จองล่วงหน้า</div>
+                <div class="card-desc">
+                    ผู้ใช้สร้างรายการจองด้วยทะเบียนรถ ประเภทรถ ช่วงเวลาเริ่มต้นและสิ้นสุด รวมถึงตัวเลือกต้องการชาร์จ EV
+                    ระบบยังไม่ยึดช่องจอดจริงในขั้นตอนจอง เพื่อไม่ลดจำนวนช่องว่างก่อนรถมาถึง
+                    เมื่อรถเข้าจอด ระบบตรวจว่าการจองยังอยู่ในช่วงเวลาและประเภทรถตรงกัน จากนั้นจัดสรรช่องและทำเครื่องหมาย reservation ว่า <strong>checked in</strong>
+                </div>
+                <div class="pattern-files" style="margin-top: 18px;">
+                    <span class="pattern-file">Reservation.java</span>
+                    <span class="pattern-file">ReservationRepository.java</span>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-icon" style="background: rgba(16,185,129,0.12);">🎫</div>
+                <div class="card-title">Monthly Membership — บัตรสมาชิกรายเดือน</div>
+                <div class="card-desc">
+                    ผูกสิทธิ์สมาชิกกับทะเบียนรถ ช่วงวันที่ใช้งาน และประเภทสมาชิก โดยไม่มีช่องจอดประจำถาวร
+                    <strong>STANDARD_MEMBER</strong> ใช้ช่องทั่วไป, <strong>VIP_MEMBER</strong> ได้สิทธิ์โซน VIP ก่อนแล้ว fallback ได้,
+                    <strong>EV_MEMBER</strong> ใช้ช่อง EV เมื่อจำเป็น หากสมาชิกยังไม่หมดอายุ ค่าจอดเป็น <strong>0 บาท</strong>
+                </div>
+                <div class="pattern-files" style="margin-top: 18px;">
+                    <span class="pattern-file">Membership.java</span>
+                        <span class="pattern-file">MembershipType.java</span>
+                    <span class="pattern-file">MembershipRepository.java</span>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-icon" style="background: rgba(245,158,11,0.12);">📊</div>
+                <div class="card-title">Daily Dashboard — สรุปผลรายวัน</div>
+                <div class="card-desc">
+                    แสดงรายได้จาก Payment ที่สำเร็จ จำนวนรายการชำระ อัตราการใช้พื้นที่ จำนวนการจอง และสมาชิกที่ยังใช้งานได้
+                    ผู้ใช้เลือกวันที่บน Dashboard ใน <strong>index.html</strong> เพื่อเรียกข้อมูลจาก Server และดูรายการ reservation/member ล่าสุด
+                </div>
+                <div class="pattern-files" style="margin-top: 18px;">
+                    <span class="pattern-file">ParkingService.getDailyDashboard()</span>
+                    <span class="pattern-file">Dashboard tab</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="highlight-box reveal" style="margin-top: 32px;">
+            <h4 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 12px;">🔄 ลำดับการทำงานร่วมกัน</h4>
+            <p style="color: var(--text-secondary);">
+                สร้าง Reservation หรือ Membership พร้อมประเภทสมาชิกผ่านหน้าเว็บ ➜ REST API ตรวจข้อมูลและบันทึกใน Repository แบบ in-memory ➜
+                เมื่อ Check-in ระบบใช้ reservation ที่ตรงกับช่วงเวลาและทะเบียน ➜ calculateFee ตรวจ membership ฝั่ง Server ➜
+                Dashboard อ่าน Payment, Ticket, Reservation และ Membership เพื่อสรุปผลตามวันที่เลือก
+            </p>
+        </div>
+
+        <div class="highlight-box reveal" style="margin-top: 24px; border-color: rgba(16,185,129,0.3);">
+            <h4 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 12px; color: var(--accent-green);">📷 ANPR Member Auto-Entry — เปิดไม้กั้นอัตโนมัติ</h4>
+            <div style="color: var(--text-secondary);">
+                <p><strong>กรณีสมาชิก:</strong> กล้องอ่านทะเบียน ➜ Server ตรวจทะเบียนกับ MembershipRepository และตรวจวันหมดอายุ ➜ ตรวจว่ารถยังไม่มี Ticket ที่ active และมีช่องจอดรองรับ ➜ สร้าง Ticket อัตโนมัติ ➜ สั่ง <code>OPEN_ENTRY_GATE</code> ให้ไม้กั้นเปิด</p>
+                <p style="margin-top: 10px;"><strong>กรณีไม่ใช่สมาชิก:</strong> ระบบจะไม่เปิดไม้กั้นอัตโนมัติ แต่ส่งผลสแกนและประเภทรถให้พนักงานตรวจ จากนั้นพนักงานกด Check-in เพื่อเปิดไม้กั้นตาม workflow ปกติ</p>
+                <p style="margin-top: 10px;"><strong>ความปลอดภัย:</strong> การตัดสินใจใช้ทะเบียนและสิทธิ์จาก Server ไม่เชื่อค่าที่แก้จาก browser โดยตรง</p>
+            </div>
+            <div class="pattern-files" style="margin-top: 18px;">
+                <span class="pattern-file">POST /api/ai/anpr-entry</span>
+                <span class="pattern-file">membershipMatched</span>
+                <span class="pattern-file">MANUAL_CONFIRMATION_REQUIRED</span>
+            </div>
+        </div>
+
+        <div class="highlight-box warning reveal" style="margin-top: 24px;">
+            <h4 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 10px; color: var(--accent-orange);">🎓 ขอบเขตโครงงานและข้อจำกัด</h4>
+            <p style="color: var(--text-secondary);">
+                ระบบนี้เป็น academic simulation สำหรับสาธิต OOP, Design Patterns, REST workflow และ AI แบบ rule-based
+                โดย Membership และ Reservation บันทึกลงโฟลเดอร์ <code>data/</code> เพื่อคงข้อมูลหลัง restart server
+                ขณะที่ Ticket และ Payment ยังเป็น in-memory runtime ledger เพื่อรองรับการจำลองเวลาและการทดสอบอย่างรวดเร็ว
+                ระบบยังไม่ได้เชื่อมฐานข้อมูลจริง, payment gateway, hardware ANPR หรือ security configuration สำหรับ production deployment
+            </p>
         </div>
     </section>
 
@@ -1523,7 +1615,7 @@
         <div class="section-header reveal">
             <div class="section-label">🔌 REST API</div>
             <h2 class="section-title">API Endpoints</h2>
-            <p class="section-desc">RESTful API ทั้ง 15 เส้นทาง ให้บริการผ่าน Pure Java SE HttpServer บนพอร์ต 8080</p>
+            <p class="section-desc">RESTful API สำหรับ Core, Reservation, Membership, Dashboard และ AI ให้บริการผ่าน Pure Java SE HttpServer บนพอร์ต 8080</p>
         </div>
 
         <div class="api-table-wrap reveal">
@@ -1576,7 +1668,7 @@
                     <tr>
                         <td><span class="method-badge method-post">POST</span></td>
                         <td class="api-path">/api/lost-ticket</td>
-                        <td>แจ้งตั๋วหาย — คิดค่าปรับ 300 บาท</td>
+                        <td>แจ้งตั๋วหาย — คิดค่าจอดตามเวลาจริง + ค่าปรับ 300 บาท</td>
                         <td>Core</td>
                     </tr>
                     <tr>
@@ -1597,6 +1689,36 @@
                         <td>รายการประวัติการชำระเงินทั้งหมด</td>
                         <td>History</td>
                     </tr>
+                    <tr style="background: rgba(59,130,246,0.03);">
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td class="api-path">/api/reservations</td>
+                        <td>สร้างการจองล่วงหน้าด้วยทะเบียน ประเภทรถ และช่วงเวลา</td>
+                        <td style="color: var(--accent-blue);">Reservation</td>
+                    </tr>
+                    <tr style="background: rgba(59,130,246,0.03);">
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td class="api-path">/api/reservations</td>
+                        <td>ดูรายการจองทั้งหมดและสถานะ checked-in/cancelled</td>
+                        <td style="color: var(--accent-blue);">Reservation</td>
+                    </tr>
+                    <tr style="background: rgba(16,185,129,0.03);">
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td class="api-path">/api/memberships</td>
+                        <td>ลงทะเบียนบัตรสมาชิก ผูกกับทะเบียน ประเภทสมาชิก และวันเริ่ม-หมดอายุ</td>
+                        <td style="color: var(--accent-green);">Membership</td>
+                    </tr>
+                    <tr style="background: rgba(16,185,129,0.03);">
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td class="api-path">/api/memberships</td>
+                        <td>ดูรายการสมาชิกที่ลงทะเบียนในระบบ</td>
+                        <td style="color: var(--accent-green);">Membership</td>
+                    </tr>
+                    <tr style="background: rgba(245,158,11,0.04);">
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td class="api-path">/api/dashboard/daily</td>
+                        <td>สรุปรายได้ occupancy รายการชำระ การจอง และสมาชิกตามวันที่ (รองรับ ?date=YYYY-MM-DD)</td>
+                        <td style="color: var(--accent-orange);">Dashboard</td>
+                    </tr>
                     <tr style="background: rgba(6,182,212,0.03);">
                         <td><span class="method-badge method-post">POST</span></td>
                         <td class="api-path">/api/ai/recommend</td>
@@ -1608,6 +1730,12 @@
                         <td class="api-path">/api/ai/anpr</td>
                         <td>สแกนป้ายทะเบียนและจำแนกประเภทรถ (ANPR)</td>
                         <td style="color: var(--accent-cyan);">🤖 AI</td>
+                    </tr>
+                    <tr style="background: rgba(16,185,129,0.04);">
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td class="api-path">/api/ai/anpr-entry</td>
+                        <td>ANPR ตรวจสมาชิกและ Check-in/เปิดไม้กั้นอัตโนมัติเฉพาะทะเบียนที่มีสมาชิก valid</td>
+                        <td style="color: var(--accent-green);">🤖 AI + Gate</td>
                     </tr>
                     <tr style="background: rgba(6,182,212,0.03);">
                         <td><span class="method-badge method-get">GET</span></td>
@@ -1683,8 +1811,8 @@
 
         <div class="highlight-box warning reveal" style="margin-top: 32px; text-align: center;">
             <h4 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; color: var(--accent-orange);">⚠️ กรณีตั๋วหาย (Lost Ticket)</h4>
-            <p style="font-size: 1.5rem; font-weight: 800; color: var(--accent-red); margin: 8px 0;">ค่าปรับเหมาจ่าย 300 บาท</p>
-            <p style="font-size: 0.85rem; color: var(--text-secondary);">ตั๋วจอดรถสูญหาย คิดค่าปรับแบบเหมาจ่ายสำหรับทุกประเภทยานพาหนะ</p>
+            <p style="font-size: 1.5rem; font-weight: 800; color: var(--accent-red); margin: 8px 0;">ค่าจอดตามเวลาจริง + ค่าปรับ 300 บาท</p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary);">ตั๋วจอดรถสูญหายยังคงคิดค่าจอดสะสม และเพิ่มค่าปรับสำหรับตั๋วที่สูญหาย</p>
         </div>
     </section>
 

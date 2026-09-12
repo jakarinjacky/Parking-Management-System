@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Smart Parking System</title>
+    <style>
+        :root {
+            --bg: #091321;
+            --panel: rgba(15, 26, 42, 0.9);
+            --panel-strong: rgba(20, 34, 56, 0.98);
+            --border: rgba(148, 163, 184, 0.23);
+            --primary: #4cc9f0;
+            --accent: #8b5cf6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text: #e6eefc;
+            --muted: #9db0cc;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background:
+                radial-gradient(circle at top left, rgba(76, 201, 240, 0.2), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.2), transparent 34%),
+                linear-gradient(135deg, #08111d, #132237 45%, #0d1726);
+            color: var(--text);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .login-shell {
+            width: min(96vw, 480px);
+            background: rgba(7, 15, 24, 0.7);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(18px);
+            border-radius: 26px;
+            box-shadow: 0 30px 80px rgba(8, 15, 26, 0.65);
+            overflow: hidden;
+        }
+
+        .login-header {
+            padding: 28px 28px 16px;
+            text-align: center;
+            background: linear-gradient(180deg, rgba(16, 30, 46, 0.95), rgba(8, 17, 29, 0.88));
+            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+        }
+
+        .brand-mark {
+            width: 68px;
+            height: 68px;
+            margin: 0 auto 12px;
+            border-radius: 16px;
+            display: grid;
+            place-items: center;
+            background: linear-gradient(135deg, rgba(76, 201, 240, 0.2), rgba(139, 92, 246, 0.25));
+            border: 1px solid rgba(76, 201, 240, 0.35);
+            font-size: 28px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            margin: 8px 0 0;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .login-body {
+            padding: 22px 28px 28px;
+        }
+
+        .field {
+            margin-bottom: 18px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--muted);
+            font-weight: 600;
+            font-size: 0.92rem;
+        }
+
+        input {
+            width: 100%;
+            height: 52px;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            background: rgba(15, 23, 42, 0.95);
+            padding: 0 16px;
+            color: var(--text);
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(76, 201, 240, 0.12);
+        }
+
+        .primary-btn {
+            width: 100%;
+            height: 52px;
+            border: none;
+            border-radius: 14px;
+            background: linear-gradient(135deg, var(--primary), #3b82f6);
+            color: #04131f;
+            font-weight: 800;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.15s ease, filter 0.2s ease;
+        }
+
+        .primary-btn:hover { filter: brightness(1.05); }
+        .primary-btn:active { transform: translateY(1px); }
+
+        .error-box {
+            display: none;
+            margin-top: 14px;
+            padding: 12px 14px;
+            border: 1px solid rgba(239, 68, 68, 0.45);
+            background: rgba(127, 29, 29, 0.25);
+            color: #fecaca;
+            border-radius: 12px;
+            font-size: 0.92rem;
+        }
+
+        .demo-box {
+            margin-top: 22px;
+            padding: 16px 18px;
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 16px;
+            background: rgba(15, 23, 42, 0.65);
+        }
+
+        .demo-box h3 {
+            margin: 0 0 12px;
+            font-size: 0.95rem;
+            color: var(--warning);
+        }
+
+        .account-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .account-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            background: rgba(15, 30, 44, 0.72);
+            border-radius: 10px;
+            padding: 8px 10px;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        .account-item strong { color: var(--text); }
+
+        @media (max-width: 540px) {
+            .login-shell { width: min(92vw, 420px); }
+            .login-header, .login-body { padding-left: 20px; padding-right: 20px; }
+        }
+    </style>
+</head>
+<body>
+<div class="login-shell">
+    <div class="login-header">
+        <div class="brand-mark">🅿️</div>
+        <h1>Smart Parking System</h1>
+        <p class="subtitle">เข้าสู่ระบบก่อนใช้งาน<br>เพื่อระบุตัวตนพนักงานที่ดูแลเข้าหรือออกรถ</p>
+    </div>
+
+    <div class="login-body">
+        <form id="loginForm">
+            <div class="field">
+                <label for="username">ชื่อผู้ใช้งาน</label>
+                <input id="username" name="username" type="text" placeholder="เช่น admin หรือ staff01" required>
+            </div>
+
+            <div class="field">
+                <label for="password">รหัสผ่าน</label>
+                <input id="password" name="password" type="password" placeholder="กรอกรหัสผ่าน" required>
+            </div>
+
+            <button class="primary-btn" type="submit">เข้าสู่ระบบ</button>
+            <div id="loginError" class="error-box" aria-live="polite"></div>
+        </form>
+
+        <div class="demo-box">
+            <h3>บัญชีทดสอบ</h3>
+            <div class="account-list">
+                <div class="account-item"><strong>Admin</strong><span>admin / admin123</span></div>
+                <div class="account-item"><strong>Staff 01</strong><span>staff01 / staff123</span></div>
+                <div class="account-item"><strong>Staff 02</strong><span>staff02 / staff123</span></div>
+                <div class="account-item"><strong>Staff 03</strong><span>staff03 / staff123</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const loginForm = document.getElementById('loginForm');
+    const errorBox = document.getElementById('loginError');
+    const API_BASE = 'http://localhost:8080/api';
+
+    loginForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        errorBox.style.display = 'none';
+        errorBox.textContent = '';
+
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value.trim();
+
+        try {
+            const response = await fetch(`${API_BASE}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'เข้าสู่ระบบไม่สำเร็จ');
+            }
+
+            window.location.href = 'index.html';
+        } catch (error) {
+            errorBox.textContent = error.message;
+            errorBox.style.display = 'block';
+        }
+    });
+</script>
+</body>
+</html>

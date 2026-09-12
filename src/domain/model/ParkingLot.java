@@ -1,12 +1,9 @@
 package domain.model;
 
-import domain.enums.SlotStatus;
 import domain.enums.SlotType;
 import domain.observer.ParkingLotObserver;
 import domain.strategy.NearestFirstAllocationStrategy;
 import domain.strategy.SlotAllocationStrategy;
-
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -64,6 +61,22 @@ public class ParkingLot {
         notifySlotUpdated(slot);
         notifyOccupancyChanged();
         return slot;
+    }
+
+    public synchronized Slot parkVehicle(Vehicle vehicle, SlotType preferredType) {
+        Optional<Slot> preferredSlot = floors.stream()
+                .map(floor -> floor.findAvailableSlotFor(vehicle, preferredType))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst();
+        if (preferredSlot.isPresent()) {
+            Slot slot = preferredSlot.get();
+            slot.assignVehicle(vehicle);
+            notifySlotUpdated(slot);
+            notifyOccupancyChanged();
+            return slot;
+        }
+        return parkVehicle(vehicle);
     }
 
     public synchronized Vehicle vacateSlot(String slotNumber) {

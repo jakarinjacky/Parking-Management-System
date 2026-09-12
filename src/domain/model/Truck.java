@@ -12,6 +12,6 @@ public class Truck extends Vehicle {
 
     @Override
     public boolean canParkIn(Slot slot) {
-        return slot.getSlotType() == SlotType.LARGE;
+        return slot.getSlotType() == SlotType.LARGE || slot.getSlotType() == SlotType.VIP;
     }
 }
