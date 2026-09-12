@@ -1,8 +1,11 @@
 // --- Auth Guard (เช็กการล็อกอินก่อนเข้าหน้า index.html) ---
+// --- Auth Guard System ---
 (function checkAuth() {
     const isLoggedIn = localStorage.getItem('isLoggedIn');
     if (isLoggedIn !== 'true') {
-        window.location.href = 'login.html';
+        const currentPath = window.location.pathname;
+        const loginTarget = currentPath.substring(0, currentPath.lastIndexOf('/') + 1) + 'login.html';
+        window.location.href = loginTarget;
     }
 })();
 /**
