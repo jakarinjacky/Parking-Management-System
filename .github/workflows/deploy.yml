@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -22,6 +21,57 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Enable demo authentication for GitHub Pages
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('web/js/app.js')
+          text = path.read_text(encoding='utf-8')
+
+          old_catch = """    } catch (err) {
+        window.location.href = 'login.html';
+        return false;
+    }
+}"""
+
+          new_catch = """    } catch (err) {
+        // GitHub Pages has no Java backend; accept the demo login saved by login.html.
+        if (window.location.hostname.endsWith('github.io') && localStorage.getItem('isLoggedIn') === 'true') {
+            const username = localStorage.getItem('username') || 'staff01';
+            const demoUser = {
+                username: username,
+                displayName: username === 'admin' ? 'Administrator' : username,
+                role: username === 'admin' ? 'admin' : 'staff'
+            };
+            appState.currentUser = demoUser;
+            updateCurrentUserBadge(demoUser);
+            return true;
+        }
+
+        window.location.href = 'login.html';
+        return false;
+    }
+}"""
+
+          old_logout = """async function logout() {
+    try {"""
+          new_logout = """async function logout() {
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('username');
+    try {"""
+
+          if old_catch not in text:
+              raise SystemExit('Could not find initializeSession catch block')
+          if old_logout not in text:
+              raise SystemExit('Could not find logout function')
+
+          text = text.replace(old_catch, new_catch, 1)
+          text = text.replace(old_logout, new_logout, 1)
+          path.write_text(text, encoding='utf-8')
+          print('GitHub Pages demo auth enabled')
+          PY
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
