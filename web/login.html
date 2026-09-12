@@ -239,7 +239,11 @@
             // ตรงส่วนย้ายหน้า ให้แก้เป็นบรรทัดนี้ทั้งหมด:
             localStorage.setItem('isLoggedIn', 'true');
             localStorage.setItem('username', username);
-            window.location.href = 'index.html';
+            // ใช้ window.location.pathname เพื่ออ้างอิงตำแหน่งโฟลเดอร์ปัจจุบันเสมอ
+            const currentPath = window.location.pathname;
+            const redirectTarget = currentPath.substring(0, currentPath.lastIndexOf('/') + 1) + 'index.html';
+
+window.location.href = redirectTarget;
 
         } catch (error) {
             const validDemoUsers = {
