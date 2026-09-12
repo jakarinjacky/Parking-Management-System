@@ -1,3 +1,10 @@
+// --- Auth Guard (เช็กการล็อกอินก่อนเข้าหน้า index.html) ---
+(function checkAuth() {
+    const isLoggedIn = localStorage.getItem('isLoggedIn');
+    if (isLoggedIn !== 'true') {
+        window.location.href = 'login.html';
+    }
+})();
 /**
  * Smart Parking Management System - Frontend Controller
  * เชื่อมโยงกับ Pure Java SE REST API Server (พอร์ต 8080)
