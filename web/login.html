@@ -1,22 +1,3 @@
-<!-- โค้ด HTML เดิมของไฟล์ login.html -->
-
-    <script>
-        function handleLogin(e) {
-            e.preventDefault();
-            const user = document.getElementById('username').value;
-            const pass = document.getElementById('password').value;
-
-            if (user === 'admin' && pass === '1234') {
-                localStorage.setItem('isLoggedIn', 'true');
-                localStorage.setItem('username', user);
-                window.location.href = 'index.html';
-            } else {
-                alert('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-            }
-        }
-    </script>
-</body>
-</html>
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -243,6 +224,7 @@
         const password = document.getElementById('password').value.trim();
 
         try {
+            // พยายามยิงไปที่ Java API
             const response = await fetch(`${API_BASE}/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -255,12 +237,28 @@
                 throw new Error(data.error || 'เข้าสู่ระบบไม่สำเร็จ');
             }
 
+            // บันทึกสถานะล็อกอิน
+            localStorage.setItem('isLoggedIn', 'true');
+            localStorage.setItem('username', username);
             window.location.href = 'index.html';
+
         } catch (error) {
-            errorBox.textContent = error.message;
-            errorBox.style.display = 'block';
+            // Fallback: หากยังไม่ได้เปิด Java Server (หรือยิง API ไม่ติด) ให้เช็กจากบัญชี Demo เพื่อทดสอบบน GitHub Pages ได้
+            const validDemoUsers = {
+                'admin': 'admin123',
+                'staff01': 'staff123',
+                'staff02': 'staff123',
+                'staff03': 'staff123'
+            };
+
+            if (validDemoUsers[username] && validDemoUsers[username] === password) {
+                localStorage.setItem('isLoggedIn', 'true');
+                localStorage.setItem('username', username);
+                window.location.href = 'index.html';
+            } else {
+                errorBox.textContent = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+                errorBox.style.display = 'block';
+            }
         }
     });
 </script>
-</body>
-</html>
