@@ -883,6 +883,20 @@ function animateGate(type, callback) {
         redLight.classList.add('active');
         statusText.innerText = '🔴 ไม้กั้นปิดเรียบร้อย';
 
+        // แจ้ง backend ให้สถานะ Relay/ESP32 Simulator ปิดตรงกับภาพบนหน้าเว็บ
+        if (appState.isServerOnline) {
+            fetch(`${API_BASE}/hardware/gate`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    lane: type.toUpperCase(),
+                    action: 'CLOSE',
+                    reason: 'รถผ่านจุดตรวจแล้ว'
+                })
+            }).catch(() => {});
+        }
+
         setTimeout(() => {
             car.classList.remove('passed');
             if (callback) callback();

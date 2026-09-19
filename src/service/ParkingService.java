@@ -5,6 +5,11 @@ import domain.enums.PaymentMethod;
 import domain.enums.TicketStatus;
 import domain.enums.VehicleType;
 import domain.factory.VehicleFactory;
+import domain.hardware.GateController;
+import domain.hardware.GateLane;
+import domain.hardware.LicensePlateReader;
+import domain.hardware.SimulatedAnprCamera;
+import domain.hardware.SimulatedGateController;
 import domain.model.*;
 import domain.observer.DisplayBoard;
 import domain.payment.CashPayment;
@@ -43,6 +48,8 @@ public class ParkingService {
     private LocalDateTime simulatedTime;
 
     private final domain.ai.AIParkingService aiParkingService;
+    private final LicensePlateReader licensePlateReader;
+    private final GateController gateController;
 
     public ParkingService(ParkingLot parkingLot,
                           TicketRepository ticketRepository,
@@ -65,6 +72,8 @@ public class ParkingService {
         this.reservationRepository = reservationRepository;
         this.membershipRepository = membershipRepository;
         this.aiParkingService = new domain.ai.AIParkingService();
+        this.licensePlateReader = new SimulatedAnprCamera(this.aiParkingService);
+        this.gateController = new SimulatedGateController();
         this.simulatedTime = LocalDateTime.now();
 
         this.parkingLot.registerObserver(displayBoard);
@@ -168,6 +177,8 @@ public class ParkingService {
         result.put("membershipType", member.map(m -> m.getMembershipType().name()).orElse(null));
         result.put("membershipTypeDisplay", member.map(m -> m.getMembershipType().getDisplayName()).orElse(null));
         result.put("membershipValidUntil", member.map(m -> m.getValidUntil().toString()).orElse(null));
+        result.put("gateCommand", gateController.openGate(GateLane.ENTRY,
+                "ออกตั๋ว " + ticket.getTicketId() + " สำเร็จ"));
         return result;
     }
 
@@ -321,7 +332,30 @@ public class ParkingService {
         result.put("slotNumber", ticket.getSlotNumber());
         result.put("exitTime", ticket.getExitTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         result.put("message", "ไม้กั้นเปิดแล้ว ขอให้เดินทางโดยสวัสดิภาพ");
+        result.put("gateCommand", gateController.openGate(GateLane.EXIT,
+                "ตั๋ว " + ticket.getTicketId() + " ชำระเงินแล้ว"));
         return result;
+    }
+
+    /** อ่านทะเบียนผ่าน abstraction ของกล้อง เพื่อสลับเป็นกล้องจริงได้ภายหลัง */
+    public Map<String, Object> scanEntryCamera(String imageReferenceOrPlate) {
+        if (!licensePlateReader.isOnline()) throw new IllegalStateException("กล้อง ANPR ไม่ออนไลน์");
+        return licensePlateReader.readPlate(imageReferenceOrPlate);
+    }
+
+    /** สั่งไม้กั้นผ่าน abstraction ของ controller */
+    public Map<String, Object> controlGate(GateLane lane, String action, String reason) {
+        if ("OPEN".equalsIgnoreCase(action)) return gateController.openGate(lane, reason);
+        if ("CLOSE".equalsIgnoreCase(action)) return gateController.closeGate(lane, reason);
+        throw new IllegalArgumentException("action ต้องเป็น OPEN หรือ CLOSE");
+    }
+
+    public Map<String, Object> getHardwareStatus() {
+        Map<String, Object> status = new HashMap<>(gateController.getStatus());
+        status.put("cameraId", licensePlateReader.getDeviceName());
+        status.put("cameraOnline", licensePlateReader.isOnline());
+        status.put("mode", "ACADEMIC_SIMULATION");
+        return status;
     }
 
     /**

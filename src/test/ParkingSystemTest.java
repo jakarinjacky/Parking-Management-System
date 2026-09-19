@@ -6,6 +6,7 @@ import domain.enums.SlotType;
 import domain.enums.VehicleType;
 import domain.factory.SlotFactory;
 import domain.factory.VehicleFactory;
+import domain.hardware.GateLane;
 import domain.model.ParkingFloor;
 import domain.model.ParkingLot;
 import domain.model.Slot;
@@ -47,6 +48,7 @@ public class ParkingSystemTest {
         testMembershipAndReservationPersistence();
         testLostTicketIncludesParkingFee();
         testAIServicesAndExplainability();
+        testHardwareAbstractionSimulation();
 
         System.out.println("\n-------------------------------------------------");
         System.out.println("Test Results: " + testsPassed + " / " + testsRun + " passed.");
@@ -340,5 +342,24 @@ public class ParkingSystemTest {
         Map<String, Object> copilotResp = aiService.answerCopilotQuery("มีที่จอดว่างกี่ช่อง", lot, ticketRepo, paymentRepo, java.time.LocalDateTime.now());
         assertTrue("AI Copilot answers slot query with category", copilotResp.get("category").equals("SLOT_AVAILABILITY"));
         assertTrue("AI Copilot explanation contains available slots", ((String) copilotResp.get("answer")).contains("ว่าง"));
+    }
+
+    private static void testHardwareAbstractionSimulation() {
+        System.out.println("\n10. Testing Camera & Gate Hardware Abstraction:");
+        ParkingLot lot = new ParkingLot("Hardware Test", "Bangkok");
+        ParkingFloor floor = new ParkingFloor(1, "ชั้น 1");
+        floor.addSlot(SlotFactory.createSlot("HW-01", 1, SlotType.STANDARD));
+        lot.addFloor(floor);
+        ParkingService service = new ParkingService(lot, new TicketRepository(),
+                new PaymentRepository(), new DisplayBoard("Hardware Board"));
+
+        Map<String, Object> scan = service.scanEntryCamera("4กก-1234");
+        assertTrue("Simulated camera identifies plate", "4กก-1234".equals(scan.get("detectedPlate")));
+        assertTrue("Camera reports simulation mode", "SIMULATION".equals(scan.get("cameraMode")));
+
+        Map<String, Object> opened = service.controlGate(GateLane.ENTRY, "OPEN", "Unit test");
+        assertTrue("Entry gate opens through interface", "OPEN".equals(opened.get("state")));
+        Map<String, Object> closed = service.controlGate(GateLane.ENTRY, "CLOSE", "Unit test complete");
+        assertTrue("Entry gate closes through interface", "CLOSED".equals(closed.get("state")));
     }
 }

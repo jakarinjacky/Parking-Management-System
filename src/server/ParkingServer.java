@@ -9,6 +9,7 @@ import domain.enums.PaymentMethod;
 import domain.enums.SlotType;
 import domain.enums.VehicleType;
 import domain.factory.SlotFactory;
+import domain.hardware.GateLane;
 import domain.model.ParkingFloor;
 import domain.model.ParkingLot;
 import domain.model.Slot;
@@ -133,6 +134,8 @@ public class ParkingServer {
         registerProtectedRoute("/api/ai/predict", new ApiAiPredictHandler());
         registerProtectedRoute("/api/ai/insights", new ApiAiInsightsHandler());
         registerProtectedRoute("/api/ai/chat", new ApiAiChatHandler());
+        registerProtectedRoute("/api/hardware/status", new ApiHardwareStatusHandler());
+        registerProtectedRoute("/api/hardware/gate", new ApiHardwareGateHandler());
 
         // --- ส่วนของ Static Web Files Handler (Frontend) ---
         server.createContext("/", new StaticFileHandler());
@@ -891,7 +894,7 @@ public class ParkingServer {
                 Map<String, String> req = SimpleJson.parseSimpleJson(body);
                 String query = req.get("licensePlate");
 
-                Map<String, Object> result = parkingService.getAIParkingService().simulateANPR(query);
+                Map<String, Object> result = parkingService.scanEntryCamera(query);
                 sendJsonResponse(exchange, 200, result);
             } catch (Exception e) {
                 sendJsonResponse(exchange, 500, Map.of("error", e.getMessage()));
@@ -914,7 +917,7 @@ public class ParkingServer {
             try {
                 String body = readRequestBody(exchange);
                 Map<String, String> req = SimpleJson.parseSimpleJson(body);
-                Map<String, Object> scan = parkingService.getAIParkingService().simulateANPR(req.get("licensePlate"));
+                Map<String, Object> scan = parkingService.scanEntryCamera(req.get("licensePlate"));
                 String plate = (String) scan.get("detectedPlate");
                 Optional<domain.model.Membership> member = parkingService.getMembershipRepository()
                         .findValidByPlate(plate, parkingService.getCurrentTime().toLocalDate());
@@ -935,6 +938,7 @@ public class ParkingServer {
                     response.put("membershipValidUntil", member.get().getValidUntil().toString());
                     response.put("ticket", ticket);
                     response.put("gateAction", "OPEN_ENTRY_GATE");
+                    response.put("gateCommand", ticket.get("gateCommand"));
                 } else {
                     response.put("gateAction", "MANUAL_CONFIRMATION_REQUIRED");
                     response.put("message", "ไม่พบสมาชิกที่ยังใช้งานได้ กรุณาตรวจสอบข้อมูลและกดยืนยันเข้าจอด");
@@ -945,6 +949,38 @@ public class ParkingServer {
                 sendJsonResponse(exchange, 400, Map.of("error", ex.getMessage()));
             } catch (Exception ex) {
                 sendJsonResponse(exchange, 500, Map.of("error", ex.getMessage()));
+            }
+        }
+    }
+
+    /** GET /api/hardware/status - สถานะอุปกรณ์จำลอง */
+    private class ApiHardwareStatusHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
+                return;
+            }
+            sendJsonResponse(exchange, 200, parkingService.getHardwareStatus());
+        }
+    }
+
+    /** POST /api/hardware/gate - Adapter endpoint สำหรับ OPEN/CLOSE ไม้กั้น */
+    private class ApiHardwareGateHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
+                return;
+            }
+            try {
+                Map<String, String> req = SimpleJson.parseSimpleJson(readRequestBody(exchange));
+                GateLane lane = GateLane.valueOf(req.getOrDefault("lane", "ENTRY").toUpperCase());
+                String action = req.getOrDefault("action", "CLOSE");
+                sendJsonResponse(exchange, 200,
+                        parkingService.controlGate(lane, action, req.getOrDefault("reason", "Web UI command")));
+            } catch (Exception ex) {
+                sendJsonResponse(exchange, 400, Map.of("error", ex.getMessage()));
             }
         }
     }
@@ -1266,4 +1302,3 @@ public class ParkingServer {
         }
     }
 }
-

@@ -36,6 +36,10 @@
 3. **Factory Pattern**:
    - `VehicleFactory`: สร้างออบเจกต์รถตามประเภทและเงื่อนไข
    - `SlotFactory`: สร้างช่องจอดรถตามรหัสและประเภท
+4. **Adapter / Dependency Inversion (Hardware Ready)**:
+   - `LicensePlateReader`: Interface สำหรับกล้อง ANPR/IP Camera; Demo ใช้ `SimulatedAnprCamera`
+   - `GateController`: Interface สำหรับชุดควบคุมไม้กั้น; Demo ใช้ `SimulatedGateController`
+   - เมื่อต่อ ESP32/Relay หรือกล้องจริง สามารถสร้าง implementation ใหม่แทน Simulator โดยไม่แก้ Business Logic
 4. **Aggregate Root / Facade**:
    - `ParkingLot` เป็น Aggregate Root ควบคุม Floor และ Slot
    - `ParkingService` เป็น Facade เชื่อมโยง Domain Entities, Repositories, Observer และ Clock Simulation
@@ -142,6 +146,7 @@ java -cp bin server.ParkingServer
 - **Membership Types**: ลงทะเบียนผ่าน `POST /api/memberships` ได้ 3 ประเภท: `STANDARD_MEMBER` จัดช่องทั่วไป, `VIP_MEMBER` ให้โซน VIP ก่อน, `EV_MEMBER` จัดช่อง EV เมื่อจำเป็น โดยไม่มีช่องประจำถาวร
 - **Daily Dashboard**: ดูรายได้ จำนวนรายการชำระ อัตราการใช้พื้นที่ การจอง และสมาชิกที่ใช้งานผ่าน `GET /api/dashboard/daily?date=YYYY-MM-DD`
 - **ANPR Member Auto-Entry**: `POST /api/ai/anpr-entry` ตรวจทะเบียนจากกล้องกับสมาชิกที่ยัง valid; ถ้าตรงกัน server จะ check-in และสั่งเปิดไม้กั้นอัตโนมัติ ถ้าไม่ตรงจะรอพนักงานยืนยัน
+- **Hardware Simulation API**: `GET /api/hardware/status` ดูสถานะกล้อง/ไม้กั้น และ `POST /api/hardware/gate` สั่ง `OPEN`/`CLOSE` สำหรับ `ENTRY` หรือ `EXIT`
 
 ### ขอบเขตและข้อจำกัดของโครงงาน
 - ระบบนี้เป็น **academic simulation** สำหรับสาธิต OOP, Design Patterns, REST workflow และ AI rule-based ไม่ใช่ production deployment
