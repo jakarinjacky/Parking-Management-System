@@ -1,5 +1,6 @@
 package domain.enums;
 
+// [OOP: ENUM] Enum: ชุดค่าคงที่ที่ระบบอนุญาตให้เลือกใช้
 public enum MembershipType {
     STANDARD_MEMBER("สมาชิกมาตรฐาน - จัดช่องอัตโนมัติ"),
     VIP_MEMBER("สมาชิก VIP - ให้สิทธิ์โซน VIP ก่อน"),
@@ -11,6 +12,7 @@ public enum MembershipType {
         this.displayName = displayName;
     }
 
+    // [OOP: METHOD] Method getDisplayName() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public String getDisplayName() {
         return displayName;
     }

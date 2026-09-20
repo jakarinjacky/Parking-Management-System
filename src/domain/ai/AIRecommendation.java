@@ -8,6 +8,7 @@ import java.util.List;
  * Data Model: AIRecommendation
  * บันทึกผลลัพธ์การคัดสรรช่องจอดของ AI พร้อมเหตุผลประกอบ (Explainable AI - XAI)
  */
+// [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
 public class AIRecommendation {
     private final String slotNumber;
     private final int floorNumber;
@@ -19,6 +20,7 @@ public class AIRecommendation {
     private final String energyEfficiency; // ประสิทธิภาพพลังงาน/การเดินเท้า
     private final String congestionImpact; // ผลกระทบต่อการระบายการจราจร
 
+    // [OOP: CONSTRUCTOR] Constructor สำหรับสร้างและกำหนดค่าเริ่มต้นให้ object AIRecommendation
     public AIRecommendation(String slotNumber,
                             int floorNumber,
                             SlotType slotType,
@@ -39,13 +41,22 @@ public class AIRecommendation {
         this.congestionImpact = congestionImpact;
     }
 
+    // [OOP: METHOD] Method getSlotNumber() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public String getSlotNumber() { return slotNumber; }
+    // [OOP: METHOD] Method getFloorNumber() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public int getFloorNumber() { return floorNumber; }
+    // [OOP: METHOD] Method getSlotType() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public SlotType getSlotType() { return slotType; }
+    // [OOP: METHOD] Method getMatchScore() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public double getMatchScore() { return matchScore; }
+    // [OOP: METHOD] Method getConfidence() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public double getConfidence() { return confidence; }
+    // [OOP: METHOD] Method getPrimaryReason() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public String getPrimaryReason() { return primaryReason; }
+    // [OOP: METHOD] Method getFactors() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public List<String> getFactors() { return factors; }
+    // [OOP: METHOD] Method getEnergyEfficiency() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public String getEnergyEfficiency() { return energyEfficiency; }
+    // [OOP: METHOD] Method getCongestionImpact() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public String getCongestionImpact() { return congestionImpact; }
 }

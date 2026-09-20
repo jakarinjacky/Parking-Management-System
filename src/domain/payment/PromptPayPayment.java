@@ -4,10 +4,12 @@ import domain.enums.PaymentMethod;
 import domain.enums.PaymentStatus;
 import java.util.UUID;
 
+// [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
 public class PromptPayPayment extends Payment {
     private final String promptPayId; // e.g. Biller ID or Mobile / Citizen ID
     private final String qrPayload;
 
+    // [OOP: CONSTRUCTOR] Constructor สำหรับสร้างและกำหนดค่าเริ่มต้นให้ object PromptPayPayment
     public PromptPayPayment(String paymentId, String ticketId, double amount, String promptPayId) {
         super(paymentId, ticketId, amount, PaymentMethod.PROMPTPAY);
         this.promptPayId = promptPayId;
@@ -15,6 +17,7 @@ public class PromptPayPayment extends Payment {
     }
 
     @Override
+    // [OOP: METHOD] Method processPayment() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public boolean processPayment() {
         // Business logic ตรวจสอบยอดเงิน และอนุมัติการชำระผ่าน PromptPay Gateway
         if (getAmount() >= 0) {
@@ -27,10 +30,12 @@ public class PromptPayPayment extends Payment {
         }
     }
 
+    // [OOP: METHOD] Method getPromptPayId() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public String getPromptPayId() {
         return promptPayId;
     }
 
+    // [OOP: METHOD] Method getQrPayload() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public String getQrPayload() {
         return qrPayload;
     }

@@ -29,11 +29,13 @@ import service.ParkingService;
  * Automated Unit Test Suite
  * ทดสอบความถูกต้องของ OOP Logic, Invariants, และ Business Rules
  */
+// [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
 public class ParkingSystemTest {
 
     private static int testsRun = 0;
     private static int testsPassed = 0;
 
+    // [OOP: METHOD] Method main() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public static void main(String[] args) {
         System.out.println("=================================================");
         System.out.println("   Running Parking Management System Unit Tests  ");
@@ -60,6 +62,7 @@ public class ParkingSystemTest {
         System.out.println("=================================================");
     }
 
+    // [OOP: METHOD] Method assertTrue() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void assertTrue(String testName, boolean condition) {
         testsRun++;
         if (condition) {
@@ -70,6 +73,7 @@ public class ParkingSystemTest {
         }
     }
 
+    // [OOP: METHOD] Method assertEquals() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void assertEquals(String testName, double expected, double actual, double delta) {
         testsRun++;
         if (Math.abs(expected - actual) <= delta) {
@@ -80,6 +84,7 @@ public class ParkingSystemTest {
         }
     }
 
+    // [OOP: METHOD] Method testVehicleSlotCompatibility() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void testVehicleSlotCompatibility() {
         System.out.println("\n1. Testing Vehicle & Slot Polymorphic Compatibility (canParkIn):");
 
@@ -107,6 +112,7 @@ public class ParkingSystemTest {
         assertTrue("Truck CANNOT park in Standard slot", !carSlot.canFitVehicle(truck));
     }
 
+    // [OOP: METHOD] Method testPricingStrategies() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void testPricingStrategies() {
         System.out.println("\n2. Testing Pricing Strategies (Strategy Pattern):");
 
@@ -133,6 +139,7 @@ public class ParkingSystemTest {
         assertEquals("EV 1 hour is 40 THB", 40.0, evStrategy.calculateFee(Duration.ofMinutes(60), ev), 0.001);
     }
 
+    // [OOP: METHOD] Method testParkingLotAndObserverWorkflow() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void testParkingLotAndObserverWorkflow() {
         System.out.println("\n3. Testing ParkingLot, Aggregate Root & Observer Pattern:");
 
@@ -161,6 +168,7 @@ public class ParkingSystemTest {
         assertTrue("Board updated to 2 after vacate", board.getTotalAvailableSlots() == 2);
     }
 
+    // [OOP: METHOD] Method testPaymentProcessing() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void testPaymentProcessing() {
         System.out.println("\n4. Testing Polymorphic Payment Processing:");
 
@@ -179,6 +187,7 @@ public class ParkingSystemTest {
         assertTrue("Cash payment with insufficient amount fails", !failSuccess);
     }
 
+    // [OOP: METHOD] Method testServerAuthoritativePaymentAmount() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void testServerAuthoritativePaymentAmount() {
         System.out.println("\n5. Testing Server-Authoritative Payment Amount:");
 
@@ -207,6 +216,7 @@ public class ParkingSystemTest {
                 .findById(ticketId).get().getFee() == expectedFee);
     }
 
+    // [OOP: METHOD] Method testReservationMembershipAndDashboard() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void testReservationMembershipAndDashboard() {
         System.out.println("\n6. Testing Reservations, Memberships & Dashboard:");
 
@@ -259,6 +269,7 @@ public class ParkingSystemTest {
         assertTrue("EV member is assigned to charging slot", "EV-MEMBER-01".equals(evCheckIn.get("slotNumber")));
     }
 
+    // [OOP: METHOD] Method testLostTicketIncludesParkingFee() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void testLostTicketIncludesParkingFee() {
         System.out.println("\n8. Testing Lost Ticket Parking Fee:");
 
@@ -277,6 +288,7 @@ public class ParkingSystemTest {
         assertTrue("Lost ticket strategy explains both charges", ((String) lostFee.get("rateDescription")).contains("ค่าจอดตามเวลาจริง"));
     }
 
+    // [OOP: METHOD] Method testMembershipAndReservationPersistence() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void testMembershipAndReservationPersistence() {
         System.out.println("\n7. Testing Membership & Reservation Persistence:");
         try {
@@ -303,6 +315,7 @@ public class ParkingSystemTest {
         }
     }
 
+    // [OOP: METHOD] Method testAIServicesAndExplainability() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void testAIServicesAndExplainability() {
         System.out.println("\n9. Testing AI Services & Explainable AI (XAI):");
 
@@ -344,6 +357,7 @@ public class ParkingSystemTest {
         assertTrue("AI Copilot explanation contains available slots", ((String) copilotResp.get("answer")).contains("ว่าง"));
     }
 
+    // [OOP: METHOD] Method testHardwareAbstractionSimulation() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void testHardwareAbstractionSimulation() {
         System.out.println("\n10. Testing Camera & Gate Hardware Abstraction:");
         ParkingLot lot = new ParkingLot("Hardware Test", "Bangkok");
@@ -351,6 +365,7 @@ public class ParkingSystemTest {
         floor.addSlot(SlotFactory.createSlot("HW-01", 1, SlotType.STANDARD));
         lot.addFloor(floor);
         ParkingService service = new ParkingService(lot, new TicketRepository(),
+                // [OOP: METHOD] Method PaymentRepository() คือพฤติกรรมที่ interface กำหนดให้ class ผู้ใช้งานต้องสร้าง
                 new PaymentRepository(), new DisplayBoard("Hardware Board"));
 
         Map<String, Object> scan = service.scanEntryCamera("4กก-1234");

@@ -7,8 +7,10 @@ import java.util.*;
  * คลาสช่วยแปลง Java Objects / Collections เป็น JSON String
  * และแยกวิเคราะห์ JSON แบบเบาโดยไม่ต้องพึ่งพาไลบรารีภายนอก (Pure Java SE)
  */
+// [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
 public class SimpleJson {
 
+    // [OOP: METHOD] Method toJson() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public static String toJson(Object obj) {
         if (obj == null) {
             return "null";
@@ -50,6 +52,7 @@ public class SimpleJson {
         return "\"" + escape(obj.toString()) + "\"";
     }
 
+    // [OOP: METHOD] Method escape() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static String escape(String s) {
         if (s == null) return "";
         return s.replace("\\", "\\\\")
@@ -64,6 +67,7 @@ public class SimpleJson {
     /**
      * ดึงค่า Key จาก JSON Object สตริงอย่างง่าย
      */
+    // [OOP: METHOD] Method parseSimpleJson() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public static Map<String, String> parseSimpleJson(String json) {
         Map<String, String> map = new HashMap<>();
         if (json == null || json.trim().isEmpty()) {
@@ -86,6 +90,7 @@ public class SimpleJson {
         return map;
     }
 
+    // [OOP: METHOD] Method stripQuotes() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static String stripQuotes(String s) {
         if (s.startsWith("\"") && s.endsWith("\"") && s.length() >= 2) {
             return s.substring(1, s.length() - 1);

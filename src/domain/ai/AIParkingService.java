@@ -20,6 +20,7 @@ import repository.TicketRepository;
  * 4. Executive Analytics & AI Insights - บทวิเคราะห์สำหรับผู้บริหาร
  * 5. Grounded AI Copilot Assistant - แชตบอทอัจฉริยะที่เชื่อมโยงกับฐานข้อมูลจริง
  */
+// [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
 public class AIParkingService {
 
     /**
@@ -30,6 +31,7 @@ public class AIParkingService {
      * - การกระจายความหนาแน่นของการจราจรภายในแต่ละชั้น (Load Balancing)
      * - การใช้ขนาดช่องจอดอย่างคุ้มค่า (Compact Car ➔ Compact Slot เพื่อเก็บ Standard ให้คันใหญ่)
      */
+    // [OOP: METHOD] Method recommendOptimalSlot() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public AIRecommendation recommendOptimalSlot(VehicleType type, boolean requiresCharging, ParkingLot lot) {
         List<ParkingFloor> floors = lot.getFloors();
         Slot bestSlot = null;
@@ -154,6 +156,7 @@ public class AIParkingService {
         );
     }
 
+    // [OOP: METHOD] Method isSlotCompatible() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private boolean isSlotCompatible(VehicleType vType, boolean requiresCharging, SlotType slotType) {
         switch (vType) {
             case MOTORCYCLE:
@@ -174,6 +177,7 @@ public class AIParkingService {
     /**
      * จำลองระบบ AI Computer Vision & ANPR (Automatic Number Plate Recognition)
      */
+    // [OOP: METHOD] Method simulateANPR() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public Map<String, Object> simulateANPR(String queryOrPlate) {
         String plate = (queryOrPlate != null && !queryOrPlate.trim().isEmpty()) ?
                 queryOrPlate.trim() : generateRandomPlate();
@@ -214,6 +218,7 @@ public class AIParkingService {
         return result;
     }
 
+    // [OOP: METHOD] Method generateRandomPlate() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private String generateRandomPlate() {
         String[] prefixes = {"1กก-9999", "3ขข-5678", "7ศศ-1234", "9กข-777", "8กด-8888", "4นม-4321", "2รพ-9876"};
         return prefixes[new Random().nextInt(prefixes.length)];
@@ -223,6 +228,7 @@ public class AIParkingService {
      * AI Traffic & Dynamic Pricing Predictor
      * พยากรณ์ความหนาแน่นและให้คำแนะนำกลยุทธ์ราคา (Dynamic Pricing Advisory)
      */
+    // [OOP: METHOD] Method predictTrafficAndPricing() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public Map<String, Object> predictTrafficAndPricing(LocalDateTime time, ParkingLot lot) {
         int hour = time.getHour();
         int dayOfWeek = time.getDayOfWeek().getValue(); // 1 = Mon, 7 = Sun
@@ -295,6 +301,7 @@ public class AIParkingService {
         return res;
     }
 
+    // [OOP: METHOD] Method calculateHistoricalCurve() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private double calculateHistoricalCurve(int h) {
         if (h < 6) return 10.0 + h * 2.0;
         if (h <= 9) return 30.0 + (h - 6) * 18.0;
@@ -308,6 +315,7 @@ public class AIParkingService {
      * AI Executive Insights & Analytics
      * บทวิเคราะห์เชิงบริหารสำหรับผู้จัดการลานจอดรถ
      */
+    // [OOP: METHOD] Method generateExecutiveInsights() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public Map<String, Object> generateExecutiveInsights(ParkingLot lot,
                                                         TicketRepository ticketRepo,
                                                         PaymentRepository paymentRepo,
@@ -350,6 +358,7 @@ public class AIParkingService {
      * Grounded AI Copilot Chatbot Assistant
      * ตอบคำถามแบบเข้าใจบริบทและดึงสถานะระบบสดมาตอบพร้อมคำอธิบาย
      */
+    // [OOP: METHOD] Method answerCopilotQuery() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public Map<String, Object> answerCopilotQuery(String query,
                                                  ParkingLot lot,
                                                  TicketRepository ticketRepo,

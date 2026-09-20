@@ -33,6 +33,7 @@ import repository.TicketRepository;
  * ควบคุม Business Workflows ทั้งหมดของระบบที่จอดรถ
  * เชื่อมโยง Domain Model, Repositories, Observer, และ Pricing Strategies
  */
+// [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
 public class ParkingService {
     private static final double LOST_TICKET_PENALTY = 300.0;
     private final ParkingLot parkingLot;
@@ -51,14 +52,17 @@ public class ParkingService {
     private final LicensePlateReader licensePlateReader;
     private final GateController gateController;
 
+    // [OOP: CONSTRUCTOR] Constructor สำหรับสร้างและกำหนดค่าเริ่มต้นให้ object ParkingService
     public ParkingService(ParkingLot parkingLot,
                           TicketRepository ticketRepository,
                           PaymentRepository paymentRepository,
                           DisplayBoard displayBoard) {
         this(parkingLot, ticketRepository, paymentRepository, displayBoard,
+            // [OOP: METHOD] Method ReservationRepository() คือพฤติกรรมที่ interface กำหนดให้ class ผู้ใช้งานต้องสร้าง
             new ReservationRepository(), new MembershipRepository());
         }
 
+        // [OOP: CONSTRUCTOR] Constructor สำหรับสร้างและกำหนดค่าเริ่มต้นให้ object ParkingService
         public ParkingService(ParkingLot parkingLot,
                   TicketRepository ticketRepository,
                   PaymentRepository paymentRepository,
@@ -83,6 +87,7 @@ public class ParkingService {
      * ดึงเวลาจำลองปัจจุบันของระบบ
      * @return เวลาจำลอง LocalDateTime
      */
+    // [OOP: METHOD] Method getCurrentTime() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public synchronized LocalDateTime getCurrentTime() {
         return simulatedTime;
     }
@@ -91,6 +96,7 @@ public class ParkingService {
      * เลื่อนเวลาจำลองไปข้างหน้า (หรือย้อนหลัง) ตามจำนวนนาทีที่กำหนด
      * @param minutes จำนวนนาทีที่ต้องการปรับเลื่อน
      */
+    // [OOP: METHOD] Method fastForwardMinutes() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public synchronized void fastForwardMinutes(long minutes) {
         this.simulatedTime = this.simulatedTime.plusMinutes(minutes);
     }
@@ -98,6 +104,7 @@ public class ParkingService {
     /**
      * รีเซ็ตเวลาจำลองกลับมาเป็นเวลาปัจจุบันของเครื่องคอมพิวเตอร์
      */
+    // [OOP: METHOD] Method resetTime() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public synchronized void resetTime() {
         this.simulatedTime = LocalDateTime.now();
     }
@@ -105,6 +112,7 @@ public class ParkingService {
     /**
      * Workflow 1: นำรถเข้าจอด (Vehicle Entry & Ticket Issuance)
      */
+    // [OOP: METHOD] Method checkIn() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public synchronized Map<String, Object> checkIn(VehicleType type, String licensePlate, boolean requiresCharging) {
         if (licensePlate == null || licensePlate.trim().isEmpty()) {
             throw new IllegalArgumentException("กรุณาระบุเลขทะเบียนรถ");
@@ -185,6 +193,7 @@ public class ParkingService {
     /**
      * Workflow 2: คำนวณค่าจอดก่อนชำระเงิน (Fee Calculation Preview)
      */
+    // [OOP: METHOD] Method calculateFee() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public synchronized Map<String, Object> calculateFee(String ticketIdOrPlate) {
         Ticket ticket = findTicket(ticketIdOrPlate);
         if (ticket.getStatus() == TicketStatus.EXITED) {
@@ -251,6 +260,7 @@ public class ParkingService {
     /**
      * Workflow 3: ชำระเงิน (Polymorphic Payment Processing)
      */
+    // [OOP: METHOD] Method processPayment() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public synchronized Map<String, Object> processPayment(String ticketId,
                                                           PaymentMethod method,
                                                           Double cashTendered,
@@ -313,6 +323,7 @@ public class ParkingService {
     /**
      * Workflow 4: นำรถออกจากลานจอด (Exit Gate Processing)
      */
+    // [OOP: METHOD] Method exitGate() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public synchronized Map<String, Object> exitGate(String ticketId) {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new IllegalArgumentException("ไม่พบตั๋วหมายเลข " + ticketId));
@@ -338,18 +349,21 @@ public class ParkingService {
     }
 
     /** อ่านทะเบียนผ่าน abstraction ของกล้อง เพื่อสลับเป็นกล้องจริงได้ภายหลัง */
+    // [OOP: METHOD] Method scanEntryCamera() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public Map<String, Object> scanEntryCamera(String imageReferenceOrPlate) {
         if (!licensePlateReader.isOnline()) throw new IllegalStateException("กล้อง ANPR ไม่ออนไลน์");
         return licensePlateReader.readPlate(imageReferenceOrPlate);
     }
 
     /** สั่งไม้กั้นผ่าน abstraction ของ controller */
+    // [OOP: METHOD] Method controlGate() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public Map<String, Object> controlGate(GateLane lane, String action, String reason) {
         if ("OPEN".equalsIgnoreCase(action)) return gateController.openGate(lane, reason);
         if ("CLOSE".equalsIgnoreCase(action)) return gateController.closeGate(lane, reason);
         throw new IllegalArgumentException("action ต้องเป็น OPEN หรือ CLOSE");
     }
 
+    // [OOP: METHOD] Method getHardwareStatus() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public Map<String, Object> getHardwareStatus() {
         Map<String, Object> status = new HashMap<>(gateController.getStatus());
         status.put("cameraId", licensePlateReader.getDeviceName());
@@ -361,6 +375,7 @@ public class ParkingService {
     /**
      * Workflow 5: แจ้งตั๋วสูญหาย
      */
+    // [OOP: METHOD] Method markTicketLost() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public synchronized Map<String, Object> markTicketLost(String ticketIdOrPlate) {
         Ticket ticket = findTicket(ticketIdOrPlate);
         double parkingFee = calculateParkingFee(ticket, ticket.calculateDuration(this.simulatedTime));
@@ -369,6 +384,7 @@ public class ParkingService {
         return calculateFee(ticket.getTicketId());
     }
 
+    // [OOP: METHOD] Method calculateParkingFee() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private double calculateParkingFee(Ticket ticket, Duration duration) {
         if (membershipRepository.findValidByPlate(ticket.getLicensePlate(), simulatedTime.toLocalDate()).isPresent()) {
             return 0.0;
@@ -386,6 +402,7 @@ public class ParkingService {
      * @return อ็อบเจกต์ Ticket ที่ค้นพบ
      * @throws IllegalArgumentException หากไม่พบข้อมูลตั๋วในระบบ
      */
+    // [OOP: METHOD] Method findTicket() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public Ticket findTicket(String ticketIdOrPlate) {
         if (ticketIdOrPlate == null || ticketIdOrPlate.trim().isEmpty()) {
             throw new IllegalArgumentException("กรุณาระบุเลขที่ตั๋วหรือป้ายทะเบียน");
@@ -403,6 +420,7 @@ public class ParkingService {
     /**
      * ดึงอ็อบเจกต์ ParkingLot ของระบบ
      */
+    // [OOP: METHOD] Method getParkingLot() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public ParkingLot getParkingLot() {
         return parkingLot;
     }
@@ -410,6 +428,7 @@ public class ParkingService {
     /**
      * ดึง TicketRepository ที่เก็บข้อมูลตั๋วทั้งหมด
      */
+    // [OOP: METHOD] Method getTicketRepository() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public TicketRepository getTicketRepository() {
         return ticketRepository;
     }
@@ -417,13 +436,17 @@ public class ParkingService {
     /**
      * ดึง PaymentRepository ที่เก็บประวัติการชำระเงินทั้งหมด
      */
+    // [OOP: METHOD] Method getPaymentRepository() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public PaymentRepository getPaymentRepository() {
         return paymentRepository;
     }
 
+    // [OOP: METHOD] Method getReservationRepository() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public ReservationRepository getReservationRepository() { return reservationRepository; }
+    // [OOP: METHOD] Method getMembershipRepository() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public MembershipRepository getMembershipRepository() { return membershipRepository; }
 
+    // [OOP: METHOD] Method createReservation() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public synchronized Map<String, Object> createReservation(String licensePlate, VehicleType type,
                                                                boolean requiresCharging, LocalDateTime startTime,
                                                                LocalDateTime endTime) {
@@ -436,6 +459,7 @@ public class ParkingService {
         return reservationMap(reservation);
     }
 
+    // [OOP: METHOD] Method cancelReservation() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public synchronized Map<String, Object> cancelReservation(String reservationId) {
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new IllegalArgumentException("ไม่พบรายการจอง " + reservationId));
@@ -444,6 +468,7 @@ public class ParkingService {
         return reservationMap(reservation);
     }
 
+    // [OOP: METHOD] Method createMembership() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public synchronized Map<String, Object> createMembership(String memberId, String memberName,
                                                               String licensePlate, MembershipType membershipType,
                                                               LocalDate validFrom,
@@ -461,6 +486,7 @@ public class ParkingService {
         return result;
     }
 
+    // [OOP: METHOD] Method getDailyDashboard() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public synchronized Map<String, Object> getDailyDashboard(LocalDate date) {
         double revenue = paymentRepository.findAll().stream()
                 .filter(p -> p.getPaymentTime().toLocalDate().equals(date))
@@ -483,6 +509,7 @@ public class ParkingService {
         return result;
     }
 
+    // [OOP: METHOD] Method reservationMap() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private Map<String, Object> reservationMap(Reservation reservation) {
         Map<String, Object> result = new HashMap<>();
         result.put("reservationId", reservation.getReservationId());
@@ -499,6 +526,7 @@ public class ParkingService {
     /**
      * ดึง DisplayBoard ป้ายแสดงผลสถานะที่เชื่อมต่อผ่าน Observer Pattern
      */
+    // [OOP: METHOD] Method getDisplayBoard() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public DisplayBoard getDisplayBoard() {
         return displayBoard;
     }
@@ -506,6 +534,7 @@ public class ParkingService {
     /**
      * ดึง AIParkingService สำหรับการประมวลผลระบบปัญญาประดิษฐ์และ XAI
      */
+    // [OOP: METHOD] Method getAIParkingService() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public domain.ai.AIParkingService getAIParkingService() {
         return aiParkingService;
     }
@@ -515,6 +544,7 @@ public class ParkingService {
      * @param minutes จำนวนนาทีทั้งหมด
      * @return ข้อความแสดงระยะเวลา
      */
+    // [OOP: METHOD] Method formatDuration() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private String formatDuration(long minutes) {
         long d = minutes / (24 * 60);
         long h = (minutes % (24 * 60)) / 60;
