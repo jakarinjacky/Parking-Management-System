@@ -71,11 +71,24 @@
     function loadState() {
         try {
             const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
-            if (parsed && parsed.version === 3 && Array.isArray(parsed.tickets)) return parsed;
+            if (parsed && parsed.version === 3 && Array.isArray(parsed.tickets)) {
+                pruneHistory(parsed);
+                saveState(parsed);
+                return parsed;
+            }
         } catch (_) {}
         const fresh = initialState();
         saveState(fresh);
         return fresh;
+    }
+
+    function pruneHistory(state) {
+        const cutoff = new Date(nowMs(state));
+        cutoff.setMonth(cutoff.getMonth() - 3);
+        state.tickets = state.tickets.filter(ticket => {
+            if (ticket.status !== 'EXITED') return true;
+            return new Date(ticket.exitAt || ticket.entryAt).getTime() >= cutoff.getTime();
+        });
     }
 
     function saveState(state) {
@@ -387,6 +400,49 @@
         }));
         appState.activeTickets = tickets;
         renderTicketsTable(tickets);
+    };
+
+    window.loadParkingHistory = async function () {
+        const state = loadState();
+        const fromInput = document.getElementById('historyFrom');
+        const toInput = document.getElementById('historyTo');
+        const plateInput = document.getElementById('historyPlate');
+        const now = new Date(nowMs(state));
+        if (toInput && !toInput.value) toInput.value = iso(now.getTime()).slice(0, 10);
+        if (fromInput && !fromInput.value) {
+            const from = new Date(now);
+            from.setMonth(from.getMonth() - 3);
+            fromInput.value = iso(from.getTime()).slice(0, 10);
+        }
+        const from = fromInput?.value ? new Date(`${fromInput.value}T00:00:00`).getTime() : 0;
+        const to = toInput?.value ? new Date(`${toInput.value}T23:59:59`).getTime() : Number.MAX_SAFE_INTEGER;
+        const plate = plateInput?.value.trim().toLowerCase() || '';
+        const filtered = state.tickets
+            .filter(t => {
+                const entered = new Date(t.entryAt).getTime();
+                return entered >= from && entered <= to && (!plate || t.licensePlate.toLowerCase().includes(plate));
+            })
+            .sort((a, b) => new Date(b.entryAt) - new Date(a.entryAt));
+        const records = filtered.map(t => ({
+            ticketId: t.ticketId,
+            licensePlate: t.licensePlate,
+            vehicleType: t.vehicleType,
+            vehicleTypeDisplay: typeMeta[t.vehicleType]?.label || t.vehicleType,
+            floorNumber: t.floorNumber,
+            slotNumber: t.slotNumber,
+            entryTime: fmt(new Date(t.entryAt).getTime()),
+            exitTime: t.exitAt ? fmt(new Date(t.exitAt).getTime()) : null,
+            status: t.status === 'EXITED' ? 'EXITED' : 'IN_PARKING',
+            fee: Number(t.fee || 0)
+        }));
+        const exited = filtered.filter(t => t.status === 'EXITED');
+        document.getElementById('historyEnteredCount').innerText = filtered.length;
+        document.getElementById('historyExitedCount').innerText = exited.length;
+        document.getElementById('historyParkedCount').innerText = filtered.length - exited.length;
+        document.getElementById('historyRevenue').innerText = `฿${exited.reduce((sum, t) => sum + Number(t.fee || 0), 0).toFixed(2)}`;
+        document.getElementById('historyRetentionMessage').innerText =
+            `แสดง ${fromInput?.value || '-'} ถึง ${toInput?.value || '-'} | Demo เก็บข้อมูลใน Browser ย้อนหลัง 3 เดือน`;
+        window.renderParkingHistory(records);
     };
 
     window.handleCheckIn = async function (event) {

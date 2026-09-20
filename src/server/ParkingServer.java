@@ -37,6 +37,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import repository.MembershipRepository;
+import repository.ParkingHistoryRepository;
 import repository.PaymentRepository;
 import repository.ReservationRepository;
 import repository.TicketRepository;
@@ -131,6 +132,7 @@ public class ParkingServer {
         registerProtectedRoute("/api/reservations", new ApiReservationHandler());
         registerProtectedRoute("/api/memberships", new ApiMembershipHandler());
         registerProtectedRoute("/api/dashboard/daily", new ApiDailyDashboardHandler());
+        registerProtectedRoute("/api/history", new ApiParkingHistoryHandler());
 
         // --- ส่วนของ AI Services & Explainable AI (XAI) Endpoints ---
         registerProtectedRoute("/api/ai/recommend", new ApiAiRecommendHandler());
@@ -476,6 +478,42 @@ public class ParkingServer {
                 sendJsonResponse(exchange, 200, parkingService.getDailyDashboard(date));
             } catch (IllegalArgumentException ex) { sendJsonResponse(exchange, 400, Map.of("error", ex.getMessage())); }
         }
+    }
+
+    /** GET /api/history?from=YYYY-MM-DD&to=YYYY-MM-DD&plate=ทะเบียน */
+    // [OOP: CLASS] Handler สำหรับค้นและสรุปประวัติรถเข้าออกย้อนหลังไม่เกิน 3 เดือน
+    private class ApiParkingHistoryHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) { sendCors(exchange); return; }
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
+                return;
+            }
+            try {
+                Map<String, String> params = parseQueryParameters(exchange.getRequestURI().getRawQuery());
+                LocalDate from = params.get("from") == null || params.get("from").isBlank()
+                        ? null : LocalDate.parse(params.get("from"));
+                LocalDate to = params.get("to") == null || params.get("to").isBlank()
+                        ? null : LocalDate.parse(params.get("to"));
+                sendJsonResponse(exchange, 200,
+                        parkingService.getParkingHistory(from, to, params.get("plate")));
+            } catch (IllegalArgumentException ex) {
+                sendJsonResponse(exchange, 400, Map.of("error", ex.getMessage()));
+            }
+        }
+    }
+
+    private static Map<String, String> parseQueryParameters(String rawQuery) {
+        Map<String, String> params = new HashMap<>();
+        if (rawQuery == null || rawQuery.isBlank()) return params;
+        for (String pair : rawQuery.split("&")) {
+            String[] parts = pair.split("=", 2);
+            String key = URLDecoder.decode(parts[0], StandardCharsets.UTF_8);
+            String value = parts.length == 2 ? URLDecoder.decode(parts[1], StandardCharsets.UTF_8) : "";
+            params.put(key, value);
+        }
+        return params;
     }
 
     /**
@@ -1333,9 +1371,11 @@ public class ParkingServer {
         Path dataDir = Paths.get("data").toAbsolutePath();
         MembershipRepository membershipRepo = new MembershipRepository(dataDir.resolve("memberships.db"));
         ReservationRepository reservationRepo = new ReservationRepository(dataDir.resolve("reservations.db"));
+        ParkingHistoryRepository historyRepo = new ParkingHistoryRepository(dataDir.resolve("parking-history.db"));
         DisplayBoard displayBoard = new DisplayBoard("BOARD-MAIN-GATE");
 
-        ParkingService service = new ParkingService(lot, ticketRepo, paymentRepo, displayBoard, reservationRepo, membershipRepo);
+        ParkingService service = new ParkingService(lot, ticketRepo, paymentRepo, displayBoard,
+                reservationRepo, membershipRepo, historyRepo);
 
         // 3. จำลองการจอดรถล่วงหน้าเพื่อให้มีข้อมูลในระบบพร้อมทดสอบ
         seedDemoData(service);

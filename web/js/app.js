@@ -94,11 +94,80 @@ function switchTab(tabId) {
         loadParkingLotData();
     } else if (tabId === 'tickets-history') {
         loadTicketsAndPayments();
+    } else if (tabId === 'vehicle-history') {
+        loadParkingHistory();
     } else if (tabId === 'exit-cashier') {
         refreshActivePlateChips();
     } else if (tabId === 'dashboard') {
         loadDailyDashboard();
     }
+}
+
+function historyDateValue(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function escapeHistoryHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+}
+
+async function loadParkingHistory() {
+    const fromInput = document.getElementById('historyFrom');
+    const toInput = document.getElementById('historyTo');
+    const plateInput = document.getElementById('historyPlate');
+    if (!fromInput || !toInput) return;
+
+    const now = new Date();
+    if (!toInput.value) toInput.value = historyDateValue(now);
+    if (!fromInput.value) {
+        const threeMonthsAgo = new Date(now);
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+        fromInput.value = historyDateValue(threeMonthsAgo);
+    }
+
+    const params = new URLSearchParams({ from: fromInput.value, to: toInput.value });
+    if (plateInput?.value.trim()) params.set('plate', plateInput.value.trim());
+
+    try {
+        const res = await fetch(`${API_BASE}/history?${params}`, { credentials: 'include' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'ไม่สามารถโหลดประวัติได้');
+
+        document.getElementById('historyEnteredCount').innerText = data.enteredCount || 0;
+        document.getElementById('historyExitedCount').innerText = data.exitedCount || 0;
+        document.getElementById('historyParkedCount').innerText = data.currentlyParkedCount || 0;
+        document.getElementById('historyRevenue').innerText = `฿${Number(data.totalRevenue || 0).toFixed(2)}`;
+        document.getElementById('historyRetentionMessage').innerText =
+            `แสดง ${data.from} ถึง ${data.to} | ระบบเก็บข้อมูลย้อนหลัง ${data.retentionMonths} เดือน`;
+        renderParkingHistory(data.records || []);
+    } catch (err) {
+        document.getElementById('historyRetentionMessage').innerText = err.message;
+        renderParkingHistory([]);
+    }
+}
+
+function renderParkingHistory(records) {
+    const tbody = document.getElementById('vehicleHistoryTableBody');
+    if (!tbody) return;
+    if (!records.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-muted" style="text-align:center;">ไม่พบประวัติในช่วงวันที่เลือก</td></tr>';
+        return;
+    }
+    tbody.innerHTML = records.map(item => `<tr>
+        <td class="mono text-highlight">${escapeHistoryHtml(item.ticketId)}</td>
+        <td><strong>${escapeHistoryHtml(item.licensePlate)}</strong></td>
+        <td>${escapeHistoryHtml(item.vehicleTypeDisplay || item.vehicleType)}</td>
+        <td>ชั้น ${Number(item.floorNumber || 0)} / ${escapeHistoryHtml(item.slotNumber)}</td>
+        <td class="mono">${escapeHistoryHtml(item.entryTime)}</td>
+        <td class="mono">${escapeHistoryHtml(item.exitTime || '-')}</td>
+        <td><span class="status-tag ${item.status === 'EXITED' ? 'exited' : 'active'}">${item.status === 'EXITED' ? 'ออกแล้ว' : 'ยังอยู่ในลาน'}</span></td>
+        <td class="mono text-success">฿${Number(item.fee || 0).toFixed(2)}</td>
+    </tr>`).join('');
 }
 
 async function loadDailyDashboard() {
