@@ -8,6 +8,7 @@ import domain.enums.MembershipType;
 import domain.enums.PaymentMethod;
 import domain.enums.SlotType;
 import domain.enums.VehicleType;
+import domain.enums.UserRole;
 import domain.factory.SlotFactory;
 import domain.hardware.GateLane;
 import domain.model.ParkingFloor;
@@ -60,6 +61,7 @@ public class ParkingServer {
 
     private static final Map<String, EmployeeAccount> SYSTEM_USERS = new HashMap<>();
     static {
+        SYSTEM_USERS.put("owner", new EmployeeAccount("owner", "owner123", "owner", "เจ้าของลานจอดรถ"));
         SYSTEM_USERS.put("admin", new EmployeeAccount("admin", "admin123", "admin", "ผู้ดูแลระบบ"));
         SYSTEM_USERS.put("staff01", new EmployeeAccount("staff01", "staff123", "staff", "พนักงานจุดเข้า-ออกรถ 1"));
         SYSTEM_USERS.put("staff02", new EmployeeAccount("staff02", "staff123", "staff", "พนักงานจุดเข้า-ออกรถ 2"));
@@ -156,11 +158,21 @@ public class ParkingServer {
                 return;
             }
 
-            if (!isAuthenticated(exchange)) {
+            EmployeeSession session = getSession(exchange);
+            if (session == null) {
                 sendUnauthorized(exchange);
                 return;
             }
 
+            UserRole role = UserRole.fromCode(session.account.role);
+            if (!exchange.getRequestURI().getPath().equals(path)) {
+                sendJsonResponse(exchange, 404, Map.of("error", "ไม่พบ API"));
+                return;
+            }
+            if (role == null || !role.allows(path)) {
+                sendJsonResponse(exchange, 403, Map.of("error", "บัญชีนี้ไม่มีสิทธิ์ใช้งานส่วนนี้"));
+                return;
+            }
             handler.handle(exchange);
         });
     }
@@ -289,7 +301,7 @@ public class ParkingServer {
                 resp.put("username", account.username);
                 resp.put("displayName", account.displayName);
                 resp.put("role", account.role);
-                resp.put("roleLabel", "admin".equals(account.role) ? "Admin" : "Staff");
+                resp.put("roleLabel", UserRole.fromCode(account.role).getLabel());
                 resp.put("loginTime", session.loginTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 resp.put("token", token);
                 sendJsonResponse(exchange, 200, resp);
@@ -320,7 +332,7 @@ public class ParkingServer {
             resp.put("username", session.account.username);
             resp.put("displayName", session.account.displayName);
             resp.put("role", session.account.role);
-            resp.put("roleLabel", "admin".equals(session.account.role) ? "Admin" : "Staff");
+            resp.put("roleLabel", UserRole.fromCode(session.account.role).getLabel());
             resp.put("loginTime", session.loginTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             sendJsonResponse(exchange, 200, resp);
         }
@@ -378,7 +390,9 @@ public class ParkingServer {
             data.put("totalOccupied", lot.getTotalOccupied());
             data.put("occupancyRate", lot.getTotalCapacity() > 0 ?
                     Math.round(((double) lot.getTotalOccupied() / lot.getTotalCapacity()) * 100) : 0);
-            data.put("totalRevenue", parkingService.getPaymentRepository().getTotalRevenue());
+            if ("owner".equals(getSession(exchange).account.role)) {
+                data.put("totalRevenue", parkingService.getPaymentRepository().getTotalRevenue());
+            }
             data.put("displayBoardMessage", board.getLastUpdatedMessage());
             data.put("displayBoardTime", board.getLastUpdatedAt().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
 
@@ -856,6 +870,7 @@ public class ParkingServer {
             List<Ticket> tickets = parkingService.getTicketRepository().findAll();
             List<Map<String, Object>> list = new ArrayList<>();
             for (Ticket t : tickets) {
+                if ("staff".equals(getSession(exchange).account.role) && t.getExitTime() != null) continue;
                 Map<String, Object> m = new HashMap<>();
                 m.put("ticketId", t.getTicketId());
                 m.put("licensePlate", t.getLicensePlate());

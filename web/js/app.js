@@ -45,10 +45,11 @@ async function initializeSession() {
 }
 
 function updateCurrentUserBadge(user) {
+    window.applyRolePermissions?.(user);
     const badge = document.getElementById('currentUserBadge');
     if (!badge || !user) return;
 
-    const label = user.role === 'admin' ? 'ADMIN' : 'STAFF';
+    const label = { owner: 'เจ้าของ', admin: 'ผู้ดูแล', staff: 'พนักงาน' }[user.role] || 'ไม่มีสิทธิ์';
     badge.innerText = `${user.displayName} (${label})`;
     badge.title = `Username: ${user.username}`;
 }
@@ -80,6 +81,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // --- Tab Navigation ---
 function switchTab(tabId) {
+    if (window.canAccessTab && !window.canAccessTab(tabId)) return;
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
 
@@ -253,6 +255,7 @@ async function submitFeatureForm(path, payload, successMessage) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'บันทึกข้อมูลไม่สำเร็จ');
         message.innerText = successMessage;
+        loadFeatureLists();
         loadDailyDashboard();
     } catch (err) {
         message.innerText = err.message;

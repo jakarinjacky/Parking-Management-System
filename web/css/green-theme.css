@@ -12,6 +12,7 @@
     --border: #3b4940; --primary: #b9e879; --accent: #8aba91;
     --text: #edf2eb; --muted: #b0bdb3;
 }
+[hidden] { display: none !important; }
 body, body.dark-theme {
     background: radial-gradient(ellipse at 0 0, #48634528, transparent 48%), #151b19;
     color: var(--text-main); font-family: 'Prompt', sans-serif;

@@ -340,14 +340,14 @@
     window.initializeSession = async function () {
         const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
         const username = localStorage.getItem('username');
-        if (!loggedIn || !username) {
+        if (!loggedIn || !['owner', 'admin', 'staff01', 'staff02', 'staff03'].includes(username)) {
             window.location.href = 'login.html';
             return false;
         }
         const demoUser = {
             username,
-            displayName: username === 'admin' ? 'Administrator' : username,
-            role: username === 'admin' ? 'admin' : 'staff'
+            displayName: username === 'owner' ? 'เจ้าของลานจอดรถ' : username === 'admin' ? 'ผู้ดูแลระบบ' : username,
+            role: username === 'owner' ? 'owner' : username === 'admin' ? 'admin' : 'staff'
         };
         appState.currentUser = demoUser;
         appState.isServerOnline = false;
@@ -746,6 +746,7 @@
         saveState(state);
         document.getElementById('reservationMessage').innerText = 'สร้างการจองสำเร็จ (Demo)';
         event.target.reset();
+        window.loadFeatureLists();
         window.loadDailyDashboard();
     };
 
@@ -773,6 +774,7 @@
         saveState(state);
         document.getElementById('membershipMessage').innerText = 'บันทึกสมาชิกสำเร็จ (Demo)';
         event.target.reset();
+        window.loadFeatureLists();
         window.loadDailyDashboard();
     };
 

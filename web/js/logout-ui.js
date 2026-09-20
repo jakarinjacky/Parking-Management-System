@@ -14,8 +14,9 @@
         badge.id = 'currentUserBadge';
         badge.className = 'user-badge';
         const username = localStorage.getItem('username') || appState?.currentUser?.username || 'ผู้ใช้งาน';
-        const role = username === 'admin' ? 'ADMIN' : 'STAFF';
-        badge.textContent = `${username === 'admin' ? 'Administrator' : username} (${role})`;
+        const user = appState?.currentUser;
+        const role = { owner: 'เจ้าของ', admin: 'ผู้ดูแล', staff: 'พนักงาน' }[user?.role] || 'กำลังตรวจสอบสิทธิ์';
+        badge.textContent = `${user?.displayName || username} (${role})`;
 
         const logoutButton = document.createElement('button');
         logoutButton.type = 'button';
