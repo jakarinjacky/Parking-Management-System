@@ -163,7 +163,10 @@ public class ParkingService {
             : parkingLot.parkVehicle(vehicle);
 
         // 3. สร้างตั๋ว Ticket
-        String ticketId = "TKT-" + simulatedTime.format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-" + ticketSequence.incrementAndGet();
+        // เติมรหัสสุ่มเพื่อไม่ให้ Ticket ID ซ้ำเมื่อปิดและเปิด Server ใหม่ในวันเดียวกัน
+        String ticketId = "TKT-" + simulatedTime.format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+                + "-" + ticketSequence.incrementAndGet()
+                + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
         Ticket ticket = new Ticket(
                 ticketId,
                 vehicle.getLicensePlate(),

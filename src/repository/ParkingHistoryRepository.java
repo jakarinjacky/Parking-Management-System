@@ -73,7 +73,8 @@ public class ParkingHistoryRepository {
     // [OOP: METHOD] ลบรายการที่ออกจากลานและเก่ากว่า 3 เดือนอัตโนมัติ
     public synchronized void purgeExpired(LocalDateTime currentTime) {
         LocalDateTime cutoff = currentTime.minusMonths(RETENTION_MONTHS);
-        boolean changed = records.values().removeIf(r -> r.hasExited() && r.getExitTime().isBefore(cutoff));
+        boolean changed = records.values().removeIf(r ->
+                (r.hasExited() ? r.getExitTime() : r.getEntryTime()).isBefore(cutoff));
         if (changed) persist();
     }
 
