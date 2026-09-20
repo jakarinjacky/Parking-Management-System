@@ -45,6 +45,7 @@
     </style>
     <link rel="stylesheet" href="css/green-theme.css">
     <script src="js/ui-effects.js" defer></script>
+    <script src="js/history-export.js" defer></script>
 </head>
 <body class="dark-theme">
     <!-- Main App Container -->
@@ -132,6 +133,8 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/><path d="M12 7v5l3 2"/></svg>
                 <span>ประวัติรถเข้าออก 3 เดือน</span>
             </button>
+            <button class="tab-btn" onclick="switchTab('reservations')">จองล่วงหน้า</button>
+            <button class="tab-btn" onclick="switchTab('memberships')">บัตรสมาชิก</button>
             <button class="tab-btn" onclick="switchTab('dashboard')">
                 <span>Dashboard รายได้</span>
             </button>
@@ -593,6 +596,7 @@
                         <label>ถึงวันที่ <input id="historyTo" type="date"></label>
                         <label>ทะเบียนรถ <input id="historyPlate" placeholder="ค้นหาทะเบียน"></label>
                         <button class="btn-primary" type="button" onclick="loadParkingHistory()">ค้นหา</button>
+                        <button id="historyExportButton" class="btn-secondary" type="button" onclick="exportParkingHistory()" disabled>ดาวน์โหลด Excel (.xlsx)</button>
                     </div>
 
                     <div class="ai-metrics-grid">
@@ -603,6 +607,7 @@
                     </div>
 
                     <p id="historyRetentionMessage" class="text-muted"></p>
+                    <p id="historyExportMessage" class="text-muted" role="status">ค้นหาข้อมูลก่อนดาวน์โหลด Excel ตามผลลัพธ์ที่แสดง</p>
                     <div class="table-responsive">
                         <table class="data-table">
                             <thead><tr><th>Ticket ID</th><th>ทะเบียน</th><th>ประเภทรถ</th><th>ชั้น / ช่อง</th><th>เวลาเข้า</th><th>เวลาออก</th><th>สถานะ</th><th>ค่าบริการ</th></tr></thead>
@@ -631,43 +636,63 @@
                         <div class="ai-metric-card"><div class="ai-metric-icon">R</div><div class="ai-metric-meta"><span class="ai-metric-label">การจองวันนี้</span><strong class="ai-metric-val" id="dailyReservations">0</strong></div></div>
                         <div class="ai-metric-card"><div class="ai-metric-icon">M</div><div class="ai-metric-meta"><span class="ai-metric-label">สมาชิกที่ใช้งาน</span><strong class="ai-metric-val" id="dailyMembers">0</strong></div></div>
                     </div>
-                    <div class="dashboard-forms">
+                    <p id="dashboardMessage" class="text-muted" role="status"></p>
+                </div>
+            </section>
+            <section id="tab-reservations" class="tab-content">
+                <div class="feature-page-grid">
+                    <div class="card dashboard-forms feature-form">
                         <form onsubmit="createReservation(event)">
                             <h3>จองล่วงหน้า</h3>
+                            <label for="reservationPlate">ทะเบียนรถ</label>
                             <input id="reservationPlate" required placeholder="ทะเบียนรถ">
+                            <label for="reservationType">ประเภทรถ</label>
                             <select id="reservationType"><option value="CAR">รถยนต์</option><option value="ELECTRIC_VEHICLE">EV</option><option value="MOTORCYCLE">มอเตอร์ไซค์</option><option value="TRUCK">รถบรรทุก</option></select>
+                            <label for="reservationStart">วันและเวลาเริ่มจอด</label>
                             <input id="reservationStart" required type="datetime-local">
+                            <label for="reservationEnd">วันและเวลาสิ้นสุด</label>
                             <input id="reservationEnd" required type="datetime-local">
                             <label><input id="reservationCharging" type="checkbox"> ต้องการจุดชาร์จ EV</label>
                             <button class="btn-primary" type="submit">สร้างการจอง</button>
                         </form>
+                        <p id="reservationMessage" class="text-muted" role="status"></p>
+                    </div>
+                    <div class="card">
+                        <h3>การจองล่าสุด</h3>
+                        <div id="reservationsList" class="feature-list"><span class="text-muted">ยังไม่มีข้อมูล</span></div>
+                    </div>
+                </div>
+            </section>
+            <section id="tab-memberships" class="tab-content">
+                <div class="feature-page-grid">
+                    <div class="card dashboard-forms feature-form">
                         <form onsubmit="createMembership(event)">
                             <h3>บัตรสมาชิก</h3>
+                            <label for="memberId">รหัสสมาชิก</label>
                             <input id="memberId" required placeholder="รหัสสมาชิก">
+                            <label for="memberName">ชื่อสมาชิก</label>
                             <input id="memberName" required placeholder="ชื่อสมาชิก">
+                            <label for="memberPlate">ทะเบียนรถ</label>
                             <input id="memberPlate" required placeholder="ทะเบียนรถ">
+                            <label for="memberType">ประเภทสมาชิก</label>
                             <select id="memberType" required>
                                 <option value="STANDARD_MEMBER">STANDARD_MEMBER - จัดช่องอัตโนมัติ</option>
                                 <option value="VIP_MEMBER">VIP_MEMBER - โซน VIP ก่อน</option>
                                 <option value="EV_MEMBER">EV_MEMBER - ช่องชาร์จเมื่อจำเป็น</option>
                             </select>
+                            <label for="memberFrom">วันที่เริ่มสมาชิก</label>
                             <input id="memberFrom" required type="date">
+                            <label for="memberUntil">วันหมดอายุ</label>
                             <input id="memberUntil" required type="date">
                             <button class="btn-primary" type="submit">บันทึกสมาชิก</button>
                         </form>
+                        <p id="membershipMessage" class="text-muted" role="status"></p>
                     </div>
-                    <div class="dashboard-lists">
-                        <div>
-                            <h3>การจองล่าสุด</h3>
-                            <div id="reservationsList" class="feature-list"><span class="text-muted">ยังไม่มีข้อมูล</span></div>
-                        </div>
-                        <div>
+                        <div class="card">
                             <h3>สมาชิกที่ลงทะเบียน</h3>
                             <div id="membershipsList" class="feature-list"><span class="text-muted">ยังไม่มีข้อมูล</span></div>
                         </div>
                     </div>
-                    <p id="dashboardMessage" class="text-muted"></p>
-                </div>
             </section>
 
             <!-- TAB 5: OOP Architecture & SOLID Explorer -->

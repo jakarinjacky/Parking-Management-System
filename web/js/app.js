@@ -100,6 +100,8 @@ function switchTab(tabId) {
         refreshActivePlateChips();
     } else if (tabId === 'dashboard') {
         loadDailyDashboard();
+    } else if (tabId === 'reservations' || tabId === 'memberships') {
+        loadFeatureLists();
     }
 }
 
@@ -116,7 +118,10 @@ function escapeHistoryHtml(value) {
         .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
 }
 
+let historyRequestVersion = 0;
 async function loadParkingHistory() {
+    const requestVersion = ++historyRequestVersion;
+    window.setHistoryExportRecords?.([]);
     const fromInput = document.getElementById('historyFrom');
     const toInput = document.getElementById('historyTo');
     const plateInput = document.getElementById('historyPlate');
@@ -132,10 +137,14 @@ async function loadParkingHistory() {
 
     const params = new URLSearchParams({ from: fromInput.value, to: toInput.value });
     if (plateInput?.value.trim()) params.set('plate', plateInput.value.trim());
+    const stillCurrent = () => requestVersion === historyRequestVersion
+        && fromInput.value === params.get('from') && toInput.value === params.get('to')
+        && (plateInput?.value.trim() || '') === (params.get('plate') || '');
 
     try {
         const res = await fetch(`${API_BASE}/history?${params}`, { credentials: 'include' });
         const data = await res.json();
+        if (!stillCurrent()) return;
         if (!res.ok) throw new Error(data.error || 'ไม่สามารถโหลดประวัติได้');
 
         document.getElementById('historyEnteredCount').innerText = data.enteredCount || 0;
@@ -146,12 +155,14 @@ async function loadParkingHistory() {
             `แสดง ${data.from} ถึง ${data.to} | ระบบเก็บข้อมูลย้อนหลัง ${data.retentionMonths} เดือน`;
         renderParkingHistory(data.records || []);
     } catch (err) {
+        if (!stillCurrent()) return;
         document.getElementById('historyRetentionMessage').innerText = err.message;
         renderParkingHistory([]);
     }
 }
 
 function renderParkingHistory(records) {
+    window.setHistoryExportRecords?.(records);
     const tbody = document.getElementById('vehicleHistoryTableBody');
     if (!tbody) return;
     if (!records.length) {
@@ -236,14 +247,15 @@ async function createMembership(event) {
 }
 
 async function submitFeatureForm(path, payload, successMessage) {
+    const message = document.getElementById(path === '/reservations' ? 'reservationMessage' : 'membershipMessage');
     try {
         const res = await fetch(`${API_BASE}${path}`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'บันทึกข้อมูลไม่สำเร็จ');
-        document.getElementById('dashboardMessage').innerText = successMessage;
+        message.innerText = successMessage;
         loadDailyDashboard();
     } catch (err) {
-        document.getElementById('dashboardMessage').innerText = err.message;
+        message.innerText = err.message;
     }
 }
 

@@ -51,6 +51,14 @@ button:focus-visible, a:focus-visible { outline: 2px solid #c5ec98; outline-offs
 .ai-metric-card { background: #232e27; }
 .ai-hero-badge { color: #c5ec98; }
 .form-input { background: #19221c; }
+.feature-page-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.feature-page-grid > * { min-width: 0; }
+.dashboard-forms.feature-form { display: block; margin: 0; }
+.feature-form input:not([type="checkbox"]), .feature-form select, #dashboardDate { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid #52644f; border-radius: 10px; background: #19221c; color: #edf2eb; }
+.feature-form label { color: #cbdcbd; font-size: .85rem; }
+.feature-form input:focus-visible, .feature-form select:focus-visible { outline: 2px solid #b9e879; outline-offset: 2px; }
+#dashboardDate { width: auto; }
+@media (max-width: 760px) { .feature-page-grid { grid-template-columns: 1fr; } }
 .parking-login { padding: 48px 6vw; grid-template-columns: minmax(0, 1fr) minmax(360px, 470px); gap: clamp(32px, 7vw, 110px); max-width: 1500px; margin: auto; }
 .parking-login .login-shell { width: 100%; background: #232c27; border: 1px solid #445447; box-shadow: 0 30px 90px #0003; }
 .parking-login .login-header { background: transparent; border-bottom: 0; padding-top: 32px; }
