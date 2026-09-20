@@ -32,8 +32,7 @@ jobs:
 
       - name: Check JavaScript syntax
         run: |
-          node --check web/js/app.js
-          node --check web/js/demo-runtime.js
+          for script in web/js/*.js; do node --check "$script"; done
 
       - name: Check HTML ids and event handlers
         run: |
@@ -43,7 +42,7 @@ jobs:
           from pathlib import Path
 
           html = Path('web/index.html').read_text(encoding='utf-8')
-          js = Path('web/js/app.js').read_text(encoding='utf-8') + '\n' + Path('web/js/demo-runtime.js').read_text(encoding='utf-8')
+          js = '\n'.join(path.read_text(encoding='utf-8') for path in sorted(Path('web/js').glob('*.js')))
 
           ids = re.findall(r'\bid=["\']([^"\']+)["\']', html)
           duplicates = [name for name, count in Counter(ids).items() if count > 1]
@@ -59,6 +58,7 @@ jobs:
 
           defined = set(re.findall(r'\bfunction\s+([A-Za-z_$][\w$]*)\s*\(', js))
           defined.update(re.findall(r'window\.([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?function', js))
+          defined.update(re.findall(r'window\.([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>', js))
           missing = sorted(called - defined)
           if missing:
               raise SystemExit('Missing event-handler functions: ' + ', '.join(missing))
