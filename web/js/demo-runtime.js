@@ -440,6 +440,7 @@
     };
 
     window.loadParkingHistory = async function () {
+        window.setHistoryExportRecords?.([]);
         const state = loadState();
         const fromInput = document.getElementById('historyFrom');
         const toInput = document.getElementById('historyTo');
@@ -743,7 +744,7 @@
             cancelled: false
         });
         saveState(state);
-        document.getElementById('dashboardMessage').innerText = 'สร้างการจองสำเร็จ (Demo)';
+        document.getElementById('reservationMessage').innerText = 'สร้างการจองสำเร็จ (Demo)';
         event.target.reset();
         window.loadDailyDashboard();
     };
@@ -770,7 +771,7 @@
         };
         if (existing) Object.assign(existing, member); else state.memberships.push(member);
         saveState(state);
-        document.getElementById('dashboardMessage').innerText = 'บันทึกสมาชิกสำเร็จ (Demo)';
+        document.getElementById('membershipMessage').innerText = 'บันทึกสมาชิกสำเร็จ (Demo)';
         event.target.reset();
         window.loadDailyDashboard();
     };

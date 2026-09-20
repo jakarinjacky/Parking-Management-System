@@ -173,11 +173,24 @@
             .login-header, .login-body { padding-left: 20px; padding-right: 20px; }
         }
     </style>
+    <link rel="stylesheet" href="css/green-theme.css">
 </head>
-<body>
+<body class="parking-login">
+<aside class="welcome-scene" aria-label="ยินดีต้อนรับสู่ Smart Parking">
+    <span class="eyebrow">SMART PARKING / EVERYDAY, SIMPLIFIED</span>
+    <h2>ทุกการจอด<br>เป็นเรื่อง<span>ง่ายขึ้น.</span></h2>
+    <p>พื้นที่เล็ก ๆ ที่ช่วยให้การดูแลลานจอดรถ<br>เป็นระบบ และสบายตากว่าเดิม</p>
+    <div class="mini-parking" aria-hidden="true">
+        <span class="parking-sign">P<span>SMART ZONE</span></span>
+        <div class="parking-bays"><i></i><i class="parked"></i><i></i></div>
+        <div class="mini-road"><span class="mini-car"></span></div>
+        <span class="scene-caption">A LITTLE SPACE. A BETTER DAY.</span>
+    </div>
+    <button type="button" class="scene-drive">ลองปล่อยรถเล่น ↗</button>
+</aside>
 <div class="login-shell">
     <div class="login-header">
-        <div class="brand-mark">🅿️</div>
+        <div class="brand-mark" aria-hidden="true">P<span>●</span></div>
         <h1>Smart Parking System</h1>
         <p class="subtitle">เข้าสู่ระบบก่อนใช้งาน<br>เพื่อระบุตัวตนพนักงานที่ดูแลเข้าหรือออกรถ</p>
     </div>
@@ -186,12 +199,12 @@
         <form id="loginForm">
             <div class="field">
                 <label for="username">ชื่อผู้ใช้งาน</label>
-                <input id="username" name="username" type="text" placeholder="เช่น admin หรือ staff01" required>
+                <input id="username" name="username" type="text" autocomplete="username" placeholder="เช่น admin หรือ staff01" required>
             </div>
 
             <div class="field">
                 <label for="password">รหัสผ่าน</label>
-                <input id="password" name="password" type="password" placeholder="กรอกรหัสผ่าน" required>
+                <div class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" placeholder="กรอกรหัสผ่าน" required><button type="button" class="password-toggle" aria-controls="password" aria-pressed="false">แสดง</button></div>
             </div>
 
             <button class="primary-btn" type="submit">เข้าสู่ระบบ</button>
@@ -210,6 +223,7 @@
     </div>
 </div>
 
+<script src="js/ui-effects.js" defer></script>
 <script>
     const loginForm = document.getElementById('loginForm');
     const errorBox = document.getElementById('loginError');
@@ -264,3 +278,5 @@ window.location.href = redirectTarget;
         }
     });
 </script>
+</body>
+</html>

@@ -32,6 +32,8 @@ jobs:
           node --check web/js/app.js
           node --check web/js/demo-runtime.js
           node --check web/js/logout-ui.js
+          node --check web/js/ui-effects.js
+          node --check web/js/history-export.js
 
       - name: Prepare presentation build
         run: |
