@@ -1377,10 +1377,13 @@ public class ParkingServer {
         ParkingService service = new ParkingService(lot, ticketRepo, paymentRepo, displayBoard,
                 reservationRepo, membershipRepo, historyRepo);
 
-        // 3. จำลองการจอดรถล่วงหน้าเพื่อให้มีข้อมูลในระบบพร้อมทดสอบ
+        // 3. ใส่ประวัติรถเข้าออกจำลองกระจายย้อนหลัง 3 เดือน (ทำซ้ำได้โดยไม่เพิ่มรายการซ้ำ)
+        seedDemoHistory(historyRepo);
+
+        // 4. จำลองรถที่กำลังจอดอยู่เพื่อให้มีข้อมูลพร้อมทดสอบ
         seedDemoData(service);
 
-        // 4. สตาร์ตเซิร์ฟเวอร์
+        // 5. สตาร์ตเซิร์ฟเวอร์
         Path webDir = Paths.get("web").toAbsolutePath();
         ParkingServer server = new ParkingServer(service, webDir);
         server.start();
@@ -1412,5 +1415,59 @@ public class ParkingServer {
         } catch (Exception e) {
             System.err.println("Seed error: " + e.getMessage());
         }
+    }
+
+    /**
+     * สร้างประวัติรถเข้าออกตัวอย่าง 30 รายการ กระจายตั้งแต่ 88 วันก่อนจนถึงเมื่อวาน
+     * ใช้ Ticket ID คงที่จึงอัปเดตรายการเดิมเมื่อเปิด Server ใหม่ ไม่สร้างข้อมูลซ้ำ
+     */
+    // [OOP: METHOD] Seed ข้อมูลตัวอย่างสำหรับหน้าประวัติย้อนหลัง 3 เดือน
+    private static void seedDemoHistory(ParkingHistoryRepository historyRepository) {
+        String[] plates = {
+                "1กก-1023", "2ขข-4587", "3คค-7712", "4งง-2098", "5จจ-6631",
+                "6ฉฉ-8145", "7ชช-3902", "8ซซ-5476", "9ญญ-1258", "1ฎฎ-9364",
+                "2ฏฏ-4071", "3ฐฐ-6829", "4ฑฑ-1537", "5ณณ-7480", "6ดด-2916",
+                "7ตต-8653", "8ถถ-3149", "9ทท-5706", "1นน-4285", "2บบ-7931",
+                "3ปป-2468", "4ผผ-9017", "5พพ-6354", "6ฟฟ-1729", "7มม-5842",
+                "8ยย-3206", "9รร-7561", "1ลล-4893", "2วว-2175", "3สส-8430"
+        };
+        LocalDateTime now = LocalDateTime.now();
+
+        for (int i = 0; i < plates.length; i++) {
+            int daysAgo = 88 - (i * 3);
+            LocalDateTime entry = now.minusDays(daysAgo)
+                    .withHour(7 + (i % 10)).withMinute((i * 7) % 60).withSecond(0).withNano(0);
+            int durationMinutes = 35 + (i % 6) * 25;
+            LocalDateTime exit = entry.plusMinutes(durationMinutes);
+            VehicleType type = switch (i % 4) {
+                case 1 -> VehicleType.ELECTRIC_VEHICLE;
+                case 2 -> VehicleType.MOTORCYCLE;
+                case 3 -> VehicleType.TRUCK;
+                default -> VehicleType.CAR;
+            };
+            int floor = type == VehicleType.MOTORCYCLE || type == VehicleType.TRUCK ? 3
+                    : type == VehicleType.ELECTRIC_VEHICLE ? 1 : 2;
+            String slot = switch (type) {
+                case ELECTRIC_VEHICLE -> "F1-0" + (1 + (i % 3));
+                case MOTORCYCLE -> "F3-0" + (1 + (i % 4));
+                case TRUCK -> "F3-0" + (5 + (i % 2));
+                default -> "F2-0" + (1 + (i % 8));
+            };
+            long hours = Math.max(1, (durationMinutes + 59L) / 60L);
+            double fee = switch (type) {
+                case MOTORCYCLE -> hours * 10.0;
+                case ELECTRIC_VEHICLE -> hours * 40.0;
+                case TRUCK -> hours * 50.0;
+                default -> hours == 1 ? 20.0 : 20.0 + (hours - 1) * 30.0;
+            };
+
+            Ticket ticket = new Ticket(String.format("HIS-DEMO-%03d", i + 1), plates[i], type,
+                    floor, slot, entry);
+            historyRepository.recordEntry(ticket, entry);
+            ticket.markPaid(fee, String.format("PAY-DEMO-%03d", i + 1), exit.minusMinutes(5));
+            ticket.markExited(exit);
+            historyRepository.recordExit(ticket, exit);
+        }
+        historyRepository.purgeExpired(now);
     }
 }

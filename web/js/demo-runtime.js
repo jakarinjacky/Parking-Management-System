@@ -6,7 +6,7 @@
 (function () {
     if (!window.location.hostname.endsWith('github.io')) return;
 
-    const STORAGE_KEY = 'smartParkingDemoStateV3';
+    const STORAGE_KEY = 'smartParkingDemoStateV4';
     const PREFERRED_SLOT_KEY = 'smartParkingPreferredSlot';
     const LOST_PENALTY = 300;
 
@@ -41,14 +41,51 @@
         return new Date(ms).toLocaleString('th-TH', { hour12: false });
     }
 
+    function demoHistoricalTickets(now) {
+        const plates = [
+            '1กก-1023','2ขข-4587','3คค-7712','4งง-2098','5จจ-6631',
+            '6ฉฉ-8145','7ชช-3902','8ซซ-5476','9ญญ-1258','1ฎฎ-9364',
+            '2ฏฏ-4071','3ฐฐ-6829','4ฑฑ-1537','5ณณ-7480','6ดด-2916',
+            '7ตต-8653','8ถถ-3149','9ทท-5706','1นน-4285','2บบ-7931',
+            '3ปป-2468','4ผผ-9017','5พพ-6354','6ฟฟ-1729','7มม-5842',
+            '8ยย-3206','9รร-7561','1ลล-4893','2วว-2175','3สส-8430'
+        ];
+        const types = ['CAR', 'ELECTRIC_VEHICLE', 'MOTORCYCLE', 'TRUCK'];
+        return plates.map((licensePlate, index) => {
+            const daysAgo = 88 - index * 3;
+            const entry = new Date(now - daysAgo * 86400000);
+            entry.setHours(7 + index % 10, (index * 7) % 60, 0, 0);
+            const durationMinutes = 35 + (index % 6) * 25;
+            const exit = new Date(entry.getTime() + durationMinutes * 60000);
+            const vehicleType = types[index % types.length];
+            const hours = Math.max(1, Math.ceil(durationMinutes / 60));
+            const fee = vehicleType === 'MOTORCYCLE' ? hours * 10
+                : vehicleType === 'ELECTRIC_VEHICLE' ? hours * 40
+                : vehicleType === 'TRUCK' ? hours * 50
+                : hours === 1 ? 20 : 20 + (hours - 1) * 30;
+            const floorNumber = ['MOTORCYCLE', 'TRUCK'].includes(vehicleType) ? 3
+                : vehicleType === 'ELECTRIC_VEHICLE' ? 1 : 2;
+            const slotNumber = vehicleType === 'ELECTRIC_VEHICLE' ? `F1-0${1 + index % 3}`
+                : vehicleType === 'MOTORCYCLE' ? `F3-0${1 + index % 4}`
+                : vehicleType === 'TRUCK' ? `F3-0${5 + index % 2}`
+                : `F2-0${1 + index % 8}`;
+            return {
+                ticketId: `HIS-DEMO-${String(index + 1).padStart(3, '0')}`,
+                licensePlate, vehicleType, floorNumber, slotNumber,
+                entryAt: iso(entry.getTime()), exitAt: iso(exit.getTime()), status: 'EXITED', fee
+            };
+        });
+    }
+
     function initialState() {
         const now = Date.now();
         return {
-            version: 3,
+            version: 4,
             offsetMinutes: 0,
             sequence: 1004,
             paymentSequence: 1,
             tickets: [
+                ...demoHistoricalTickets(now),
                 {
                     ticketId: 'TKT-DEMO-1001', licensePlate: '1กก-9999', vehicleType: 'ELECTRIC_VEHICLE',
                     floorNumber: 1, slotNumber: 'F1-01', entryAt: iso(now - 120 * 60000), status: 'ACTIVE', exitAt: null, fee: 80
@@ -71,7 +108,7 @@
     function loadState() {
         try {
             const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
-            if (parsed && parsed.version === 3 && Array.isArray(parsed.tickets)) {
+            if (parsed && parsed.version === 4 && Array.isArray(parsed.tickets)) {
                 pruneHistory(parsed);
                 saveState(parsed);
                 return parsed;
