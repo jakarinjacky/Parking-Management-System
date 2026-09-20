@@ -11,8 +11,10 @@ import domain.model.Vehicle;
  * Factory Pattern: VehicleFactory
  * จัดการการสร้างอินสแตนซ์ของคลาสตระกูล Vehicle ตามหลัก Polymorphism
  */
+// [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
 public class VehicleFactory {
 
+    // [OOP: METHOD] Method createVehicle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public static Vehicle createVehicle(VehicleType type, String licensePlate, boolean requiresCharging) {
         if (type == null) {
             throw new IllegalArgumentException("ประเภทยานพาหนะต้องไม่เป็น null");

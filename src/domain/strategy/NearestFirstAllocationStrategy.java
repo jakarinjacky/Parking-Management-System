@@ -6,9 +6,11 @@ import domain.model.Vehicle;
 import java.util.List;
 import java.util.Optional;
 
+// [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
 public class NearestFirstAllocationStrategy implements SlotAllocationStrategy {
 
     @Override
+    // [OOP: METHOD] Method findSlot() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public Optional<Slot> findSlot(List<ParkingFloor> floors, Vehicle vehicle) {
         if (floors == null || vehicle == null) {
             return Optional.empty();

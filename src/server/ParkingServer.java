@@ -49,6 +49,7 @@ import util.SimpleJson;
  * สำหรับระบบบริหารจัดการที่จอดรถอัจฉริยะ (Smart Parking Management System)
  * และให้บริการไฟล์หน้าเว็บ Frontend (Static Files เช่น HTML, CSS, JS)
  */
+// [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
 public class ParkingServer {
     private static final int PORT = 8080; // พอร์ตสำหรับรันเซิร์ฟเวอร์
     private final ParkingService parkingService; // Business Logic Service หลักของระบบ
@@ -64,6 +65,7 @@ public class ParkingServer {
         SYSTEM_USERS.put("staff03", new EmployeeAccount("staff03", "staff123", "staff", "พนักงานชำระเงิน / ทางออก"));
     }
 
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private static class EmployeeAccount {
         private final String username;
         private final String password;
@@ -78,6 +80,7 @@ public class ParkingServer {
         }
     }
 
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private static class EmployeeSession {
         private final EmployeeAccount account;
         private final LocalDateTime loginTime;
@@ -94,6 +97,7 @@ public class ParkingServer {
      * @param webRoot ที่อยู่โฟลเดอร์สำหรับเก็บไฟล์ Static Web (เช่น index.html, css, js)
      * @throws IOException หากเกิดข้อผิดพลาดในการเปิด Port หรือสร้าง Socket Server
      */
+    // [OOP: CONSTRUCTOR] Constructor สำหรับสร้างและกำหนดค่าเริ่มต้นให้ object ParkingServer
     public ParkingServer(ParkingService parkingService, Path webRoot) throws IOException {
         this.parkingService = parkingService;
         this.webRoot = webRoot;
@@ -107,6 +111,7 @@ public class ParkingServer {
     /**
      * กำหนดและลงทะเบียน Endpoints/URL Contexts ทั้งหมดที่เซิร์ฟเวอร์เปิดให้บริการ
      */
+    // [OOP: METHOD] Method registerRoutes() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private void registerRoutes() {
         server.createContext("/api/login", new ApiLoginHandler());
         server.createContext("/api/logout", new ApiLogoutHandler());
@@ -141,6 +146,7 @@ public class ParkingServer {
         server.createContext("/", new StaticFileHandler());
     }
 
+    // [OOP: METHOD] Method registerProtectedRoute() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private void registerProtectedRoute(String path, HttpHandler handler) {
         server.createContext(path, exchange -> {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -157,6 +163,7 @@ public class ParkingServer {
         });
     }
 
+    // [OOP: METHOD] Method isAuthenticated() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private boolean isAuthenticated(HttpExchange exchange) {
         String token = getCookieValue(exchange, "parking_session_token");
         if (token == null || token.isBlank()) {
@@ -166,6 +173,7 @@ public class ParkingServer {
         return session != null;
     }
 
+    // [OOP: METHOD] Method getSession() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private EmployeeSession getSession(HttpExchange exchange) {
         String token = getCookieValue(exchange, "parking_session_token");
         if (token == null || token.isBlank()) {
@@ -174,6 +182,7 @@ public class ParkingServer {
         return activeSessions.get(token);
     }
 
+    // [OOP: METHOD] Method getCookieValue() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static String getCookieValue(HttpExchange exchange, String name) {
         List<String> cookies = exchange.getRequestHeaders().get("Cookie");
         if (cookies == null) {
@@ -192,6 +201,7 @@ public class ParkingServer {
         return null;
     }
 
+    // [OOP: METHOD] Method setCookie() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void setCookie(HttpExchange exchange, String name, String value, int maxAgeSeconds) {
         String cookie = name + "=" + value + "; Path=/; HttpOnly; SameSite=Lax";
         if (maxAgeSeconds >= 0) {
@@ -200,6 +210,7 @@ public class ParkingServer {
         exchange.getResponseHeaders().add("Set-Cookie", cookie);
     }
 
+    // [OOP: METHOD] Method sendUnauthorized() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private void sendUnauthorized(HttpExchange exchange) throws IOException {
         sendJsonResponse(exchange, 401, Map.of(
                 "error", "กรุณาเข้าสู่ระบบก่อนใช้งาน",
@@ -210,6 +221,7 @@ public class ParkingServer {
     /**
      * เริ่มต้นการทำงานของเซิร์ฟเวอร์ (Start listening requests)
      */
+    // [OOP: METHOD] Method start() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public void start() {
         server.setExecutor(null); // ใช้ default single/multi-thread executor
         server.start();
@@ -226,12 +238,15 @@ public class ParkingServer {
     /**
      * หยุดการทำงานของเซิร์ฟเวอร์
      */
+    // [OOP: METHOD] Method stop() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public void stop() {
         server.stop(1);
     }
 
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiLoginHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -282,8 +297,10 @@ public class ParkingServer {
         }
     }
 
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiSessionHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -307,8 +324,10 @@ public class ParkingServer {
         }
     }
 
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiLogoutHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -333,8 +352,10 @@ public class ParkingServer {
      * ส่งคืนข้อมูลสถานะภาพรวม เช่น จำนวนช่องจอดว่าง, ความจุทั้งหมด,
      * อัตราการใช้งาน (Occupancy Rate), รายได้รวม และข้อความป้ายแจ้งสถานะ
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiStatusHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             // รองรับ Preflight Request สำหรับ CORS
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -377,8 +398,10 @@ public class ParkingServer {
         }
     }
 
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiReservationHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) { sendCors(exchange); return; }
             try {
@@ -409,8 +432,10 @@ public class ParkingServer {
         }
     }
 
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiMembershipHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) { sendCors(exchange); return; }
             try {
@@ -438,8 +463,10 @@ public class ParkingServer {
         }
     }
 
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiDailyDashboardHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) { sendCors(exchange); return; }
             try {
@@ -456,8 +483,10 @@ public class ParkingServer {
      * ส่งคืนข้อมูลผังลานจอดรถอย่างละเอียดทุกชั้น ทุกช่องจอด
      * พร้อมข้อมูลรถที่กำลังจอดอยู่ (ถ้ามี) เช่น ทะเบียน, เวลาที่เข้าจอด, ค่าบริการปัจจุบัน
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiLotHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -524,8 +553,10 @@ public class ParkingServer {
      * รับข้อมูล: { licensePlate: "...", vehicleType: "...", requiresCharging: "true/false" }
      * ผลลัพธ์: ออกตั๋วจอดรถ (Ticket) และระบุช่องจอดที่จัดสรรให้
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiParkHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -572,8 +603,10 @@ public class ParkingServer {
      * คำนวณและพรีวิวค่าบริการที่จอดรถ ณ เวลาจำลองปัจจุบัน
      * สามารถระบุตั๋วผ่าน Query Parameter (?ticket=...) หรือ JSON Body ({ ticketIdOrPlate: "..." })
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiCalculateFeeHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -616,8 +649,10 @@ public class ParkingServer {
      * ดำเนินการชำระเงินค่าบริการที่จอดรถ
      * รองรับวิธีชำระเงิน: CASH (เงินสด), PROMPTPAY (สแกนคิวอาร์), CREDIT_CARD (บัตรเครดิต)
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiPayHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -667,8 +702,10 @@ public class ParkingServer {
      * ตรวจสอบการออกจากลานจอดรถที่ไม้กั้นทางออก (Exit Gate)
      * ตรวจสอบว่าตั๋วชำระเงินเรียบร้อยแล้วหรือไม่ คืนพื้นที่ช่องจอดรถ และอัปเดตสถานะตั๋วเป็น COMPLETED
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiExitHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -705,8 +742,10 @@ public class ParkingServer {
      * Handler: POST /api/lost-ticket
      * แจ้งตั๋วจอดรถสูญหาย โดยระบบจะคิดค่าปรับและค่าบริการตามกฎเกณฑ์ที่กำหนด
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiLostTicketHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -732,8 +771,10 @@ public class ParkingServer {
      * - ข้ามเวลาไปข้างหน้ากี่นาที (minutes)
      * - รีเซ็ตเวลากลับมาเป็นเวลาปัจจุบัน (action: "reset")
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiTimeTravelHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -764,8 +805,10 @@ public class ParkingServer {
      * Handler: GET /api/tickets
      * ส่งคืนรายการประวัติตั๋วจอดรถทั้งหมดในระบบ (ทั้งที่กำลังจอด ชำระแล้ว หรือออกจากลานแล้ว)
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiTicketsHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -797,8 +840,10 @@ public class ParkingServer {
      * Handler: GET /api/payments
      * ส่งคืนรายการประวัติการชำระเงินทั้งหมดและยอดรวมรายได้สะสม
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiPaymentsHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -835,8 +880,10 @@ public class ParkingServer {
      * Handler: POST /api/ai/recommend
      * แนะนำช่องจอดที่เหมาะสมที่สุดด้วย AI พร้อมคำอธิบายเหตุผลอย่างโปร่งใส (XAI)
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiAiRecommendHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -881,8 +928,10 @@ public class ParkingServer {
      * Handler: POST /api/ai/anpr
      * จำลองระบบกล้อง AI ตรวจจับป้ายทะเบียน (ANPR) และจำแนกประเภทรถยนต์
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiAiAnprHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -906,8 +955,10 @@ public class ParkingServer {
      * Handler: POST /api/ai/anpr-entry
      * ตรวจทะเบียนจากกล้องและเปิดไม้กั้นอัตโนมัติเฉพาะสมาชิกที่ยังมีสิทธิ์ใช้งาน
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiAiAnprEntryHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -954,8 +1005,10 @@ public class ParkingServer {
     }
 
     /** GET /api/hardware/status - สถานะอุปกรณ์จำลอง */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiHardwareStatusHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
@@ -966,8 +1019,10 @@ public class ParkingServer {
     }
 
     /** POST /api/hardware/gate - Adapter endpoint สำหรับ OPEN/CLOSE ไม้กั้น */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiHardwareGateHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendJsonResponse(exchange, 405, Map.of("error", "Method not allowed"));
@@ -989,8 +1044,10 @@ public class ParkingServer {
      * Handler: GET /api/ai/predict
      * พยากรณ์อัตราความหนาแน่นและการปรับราคาแบบ Dynamic Pricing
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiAiPredictHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -1011,8 +1068,10 @@ public class ParkingServer {
      * Handler: GET /api/ai/insights
      * บทวิเคราะห์เชิงบริหารและข้อเสนอแนะของ AI สำหรับผู้จัดการลานจอดรถ
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiAiInsightsHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -1036,8 +1095,10 @@ public class ParkingServer {
      * Handler: POST /api/ai/chat
      * AI Copilot สนทนาและตอบคำถามเกี่ยวกับสถานะระบบ กฎ OOP และคำแนะนำ
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class ApiAiChatHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendCors(exchange);
@@ -1070,8 +1131,10 @@ public class ParkingServer {
      * Handler สำหรับการส่งไฟล์หน้าเว็บ Frontend (Static Files)
      * หากเรียก Path ว่าง ("/") จะส่งไฟล์ index.html ให้โดยอัตโนมัติ
      */
+    // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
     private class StaticFileHandler implements HttpHandler {
         @Override
+        // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             String path = exchange.getRequestURI().getPath();
             if (path == null || path.equals("/") || path.isEmpty()) {
@@ -1120,11 +1183,13 @@ public class ParkingServer {
         }
     }
 
+    // [OOP: METHOD] Method redirectToLogin() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void redirectToLogin(HttpExchange exchange) throws IOException {
         exchange.getResponseHeaders().set("Location", "/login.html");
         exchange.sendResponseHeaders(302, -1);
     }
 
+    // [OOP: METHOD] Method redirectToRoot() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void redirectToRoot(HttpExchange exchange) throws IOException {
         exchange.getResponseHeaders().set("Location", "/");
         exchange.sendResponseHeaders(302, -1);
@@ -1135,6 +1200,7 @@ public class ParkingServer {
      * @param fileName ชื่อไฟล์ที่ต้องการตรวจสอบ
      * @return ค่า Content-Type เช่น text/html, text/css, application/javascript
      */
+    // [OOP: METHOD] Method determineContentType() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static String determineContentType(String fileName) {
         if (fileName.endsWith(".html")) return "text/html; charset=UTF-8";
         if (fileName.endsWith(".css")) return "text/css; charset=UTF-8";
@@ -1152,6 +1218,7 @@ public class ParkingServer {
      * @param exchange อินสแตนซ์ HttpExchange ของคำขอปัจจุบัน
      * @throws IOException หากเกิดข้อผิดพลาดในการส่ง Response Headers
      */
+    // [OOP: METHOD] Method sendCors() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void sendCors(HttpExchange exchange) throws IOException {
         exchange.getResponseHeaders().set("Access-Control-Allow-Origin", allowedOrigin(exchange));
         exchange.getResponseHeaders().set("Access-Control-Allow-Credentials", "true");
@@ -1167,6 +1234,7 @@ public class ParkingServer {
      * @param data ข้อมูล Object ที่จะถูก Serialize เป็น JSON String
      * @throws IOException หากเกิดข้อผิดพลาดในการเขียน Response Body
      */
+    // [OOP: METHOD] Method sendJsonResponse() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void sendJsonResponse(HttpExchange exchange, int statusCode, Object data) throws IOException {
         String json = SimpleJson.toJson(data);
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
@@ -1179,6 +1247,7 @@ public class ParkingServer {
         }
     }
 
+    // [OOP: METHOD] Method allowedOrigin() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static String allowedOrigin(HttpExchange exchange) {
         String origin = exchange.getRequestHeaders().getFirst("Origin");
         if (origin == null || origin.isBlank()) return "http://localhost:8080";
@@ -1192,6 +1261,7 @@ public class ParkingServer {
      * @return ข้อความสตริงทั้งหมดที่อยู่ใน Request Body
      * @throws IOException หากเกิดข้อผิดพลาดในการอ่าน InputStream
      */
+    // [OOP: METHOD] Method readRequestBody() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static String readRequestBody(HttpExchange exchange) throws IOException {
         try (InputStream is = exchange.getRequestBody();
              ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
@@ -1217,6 +1287,7 @@ public class ParkingServer {
      * @param args อาร์กิวเมนต์จาก Command Line
      * @throws Exception หากเกิดข้อผิดพลาดขณะเริ่มระบบ
      */
+    // [OOP: METHOD] Method main() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public static void main(String[] args) throws Exception {
         // 1. สร้างอินสแตนซ์ลานจอดรถ (ParkingLot)
         ParkingLot lot = new ParkingLot("Grand Smart Parking Plaza", "88 Sukhumvit Rd, Bangkok");
@@ -1280,6 +1351,7 @@ public class ParkingServer {
      * จำลองเหตุการณ์รถเข้าจอดในช่วงเวลาต่าง ๆ เพื่อให้ระบบมีข้อมูลทดสอบที่สมจริง
      * @param service เซอร์วิสระบบที่ดูแลที่จอดรถ
      */
+    // [OOP: METHOD] Method seedDemoData() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     private static void seedDemoData(ParkingService service) {
         try {
             // รถคันที่ 1: Tesla Model Y (EV) เข้าจอด 2 ชั่วโมงที่แล้ว

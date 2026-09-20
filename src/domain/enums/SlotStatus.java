@@ -1,5 +1,6 @@
 package domain.enums;
 
+// [OOP: ENUM] Enum: ชุดค่าคงที่ที่ระบบอนุญาตให้เลือกใช้
 public enum SlotStatus {
     AVAILABLE("ว่างพร้อมจอด"),
     OCCUPIED("มีรถจอดอยู่"),
@@ -12,6 +13,7 @@ public enum SlotStatus {
         this.label = label;
     }
 
+    // [OOP: METHOD] Method getLabel() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public String getLabel() {
         return label;
     }

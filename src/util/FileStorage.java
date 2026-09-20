@@ -9,9 +9,12 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 
+// [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
 public final class FileStorage {
+    // [OOP: CONSTRUCTOR] Constructor สำหรับสร้างและกำหนดค่าเริ่มต้นให้ object FileStorage
     private FileStorage() { }
 
+    // [OOP: METHOD] Method readLines() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public static List<String> readLines(Path path) {
         try {
             return Files.exists(path) ? Files.readAllLines(path, StandardCharsets.UTF_8) : new ArrayList<>();
@@ -20,6 +23,7 @@ public final class FileStorage {
         }
     }
 
+    // [OOP: METHOD] Method writeLines() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public static void writeLines(Path path, List<String> lines) {
         try {
             Path parent = path.getParent();
@@ -31,10 +35,12 @@ public final class FileStorage {
         }
     }
 
+    // [OOP: METHOD] Method encode() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public static String encode(String value) {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8));
     }
 
+    // [OOP: METHOD] Method decode() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public static String decode(String value) {
         return new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
     }
