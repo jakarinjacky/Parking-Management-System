@@ -51,6 +51,7 @@ public class ParkingSystemTest {
         testLostTicketIncludesParkingFee();
         testAIServicesAndExplainability();
         testHardwareAbstractionSimulation();
+        testThreeMonthParkingHistoryPersistence();
 
         System.out.println("\n-------------------------------------------------");
         System.out.println("Test Results: " + testsPassed + " / " + testsRun + " passed.");
@@ -376,5 +377,43 @@ public class ParkingSystemTest {
         assertTrue("Entry gate opens through interface", "OPEN".equals(opened.get("state")));
         Map<String, Object> closed = service.controlGate(GateLane.ENTRY, "CLOSE", "Unit test complete");
         assertTrue("Entry gate closes through interface", "CLOSED".equals(closed.get("state")));
+    }
+
+    // [OOP: METHOD] ทดสอบการบันทึกประวัติถาวรและการลบข้อมูลที่เก่ากว่า 3 เดือน
+    private static void testThreeMonthParkingHistoryPersistence() {
+        System.out.println("\n11. Testing Three-Month Parking History Persistence:");
+        try {
+            Path tempDirectory = Files.createTempDirectory("parking-history-test");
+            Path historyFile = tempDirectory.resolve("parking-history.db");
+            repository.ParkingHistoryRepository history = new repository.ParkingHistoryRepository(historyFile);
+            LocalDateTime now = LocalDateTime.now();
+
+            domain.model.Ticket recent = new domain.model.Ticket(
+                    "HIS-RECENT", "กข-1234", VehicleType.CAR, 1, "H-01", now.minusHours(2));
+            history.recordEntry(recent, now);
+            recent.markPaid(50.0, "PAY-HISTORY", now.minusMinutes(5));
+            recent.markExited(now);
+            history.recordExit(recent, now);
+
+            repository.ParkingHistoryRepository reloaded = new repository.ParkingHistoryRepository(historyFile);
+            var recentRecords = reloaded.find(now.minusDays(1).toLocalDate(), now.toLocalDate(), null, now);
+            assertTrue("History survives repository reload", recentRecords.size() == 1);
+            assertTrue("History records exit and fee", !recentRecords.isEmpty()
+                    && recentRecords.get(0).hasExited() && recentRecords.get(0).getFee() == 50.0);
+
+            LocalDateTime oldTime = now.minusMonths(4);
+            domain.model.Ticket expired = new domain.model.Ticket(
+                    "HIS-OLD", "เก่า-0001", VehicleType.CAR, 1, "H-02", oldTime.minusHours(1));
+            history.recordEntry(expired, oldTime);
+            expired.markPaid(20.0, "PAY-OLD", oldTime.minusMinutes(5));
+            expired.markExited(oldTime);
+            history.recordExit(expired, oldTime);
+            history.purgeExpired(now);
+            assertTrue("Exited history older than three months is removed",
+                    history.find(now.minusMonths(6).toLocalDate(), now.toLocalDate(), null, now).stream()
+                            .noneMatch(r -> "HIS-OLD".equals(r.getTicketId())));
+        } catch (java.io.IOException ex) {
+            assertTrue("History test can create temporary storage", false);
+        }
     }
 }

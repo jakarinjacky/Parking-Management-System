@@ -24,6 +24,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 import repository.MembershipRepository;
+import repository.ParkingHistoryRepository;
 import repository.PaymentRepository;
 import repository.ReservationRepository;
 import repository.TicketRepository;
@@ -42,6 +43,7 @@ public class ParkingService {
     private final DisplayBoard displayBoard;
     private final ReservationRepository reservationRepository;
     private final MembershipRepository membershipRepository;
+    private final ParkingHistoryRepository parkingHistoryRepository;
     private final AtomicLong ticketSequence = new AtomicLong(1000);
     private final AtomicLong paymentSequence = new AtomicLong(5000);
 
@@ -58,8 +60,7 @@ public class ParkingService {
                           PaymentRepository paymentRepository,
                           DisplayBoard displayBoard) {
         this(parkingLot, ticketRepository, paymentRepository, displayBoard,
-            // [OOP: METHOD] Method ReservationRepository() คือพฤติกรรมที่ interface กำหนดให้ class ผู้ใช้งานต้องสร้าง
-            new ReservationRepository(), new MembershipRepository());
+            new ReservationRepository(), new MembershipRepository(), new ParkingHistoryRepository());
         }
 
         // [OOP: CONSTRUCTOR] Constructor สำหรับสร้างและกำหนดค่าเริ่มต้นให้ object ParkingService
@@ -69,12 +70,24 @@ public class ParkingService {
                   DisplayBoard displayBoard,
                   ReservationRepository reservationRepository,
                   MembershipRepository membershipRepository) {
+        this(parkingLot, ticketRepository, paymentRepository, displayBoard,
+                reservationRepository, membershipRepository, new ParkingHistoryRepository());
+    }
+
+    public ParkingService(ParkingLot parkingLot,
+                  TicketRepository ticketRepository,
+                  PaymentRepository paymentRepository,
+                  DisplayBoard displayBoard,
+                  ReservationRepository reservationRepository,
+                  MembershipRepository membershipRepository,
+                  ParkingHistoryRepository parkingHistoryRepository) {
         this.parkingLot = parkingLot;
         this.ticketRepository = ticketRepository;
         this.paymentRepository = paymentRepository;
         this.displayBoard = displayBoard;
         this.reservationRepository = reservationRepository;
         this.membershipRepository = membershipRepository;
+        this.parkingHistoryRepository = parkingHistoryRepository;
         this.aiParkingService = new domain.ai.AIParkingService();
         this.licensePlateReader = new SimulatedAnprCamera(this.aiParkingService);
         this.gateController = new SimulatedGateController();
@@ -160,6 +173,7 @@ public class ParkingService {
                 this.simulatedTime
         );
         ticketRepository.save(ticket);
+        parkingHistoryRepository.recordEntry(ticket, this.simulatedTime);
         reservation.ifPresent(r -> {
             r.markCheckedIn();
             reservationRepository.save(r);
@@ -336,6 +350,7 @@ public class ParkingService {
         parkingLot.vacateSlot(ticket.getSlotNumber());
         ticket.markExited(this.simulatedTime);
         ticketRepository.save(ticket);
+        parkingHistoryRepository.recordExit(ticket, this.simulatedTime);
 
         Map<String, Object> result = new HashMap<>();
         result.put("ticketId", ticket.getTicketId());
@@ -445,6 +460,43 @@ public class ParkingService {
     public ReservationRepository getReservationRepository() { return reservationRepository; }
     // [OOP: METHOD] Method getMembershipRepository() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public MembershipRepository getMembershipRepository() { return membershipRepository; }
+
+    public ParkingHistoryRepository getParkingHistoryRepository() { return parkingHistoryRepository; }
+
+    /**
+     * คืนประวัติรถเข้าออกพร้อมยอดรวม โดยจำกัดข้อมูลถาวรย้อนหลัง 3 เดือน
+     */
+    public synchronized Map<String, Object> getParkingHistory(LocalDate from, LocalDate to, String licensePlate) {
+        List<ParkingHistoryRecord> records = parkingHistoryRepository.find(
+                from, to, licensePlate, this.simulatedTime);
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (ParkingHistoryRecord record : records) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("ticketId", record.getTicketId());
+            item.put("licensePlate", record.getLicensePlate());
+            item.put("vehicleType", record.getVehicleType().name());
+            item.put("vehicleTypeDisplay", record.getVehicleType().getDisplayName());
+            item.put("floorNumber", record.getFloorNumber());
+            item.put("slotNumber", record.getSlotNumber());
+            item.put("entryTime", record.getEntryTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            item.put("exitTime", record.getExitTime() == null ? null :
+                    record.getExitTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            item.put("status", record.hasExited() ? "EXITED" : "IN_PARKING");
+            item.put("fee", record.getFee());
+            items.add(item);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("from", (from == null ? simulatedTime.minusMonths(3).toLocalDate() : from).toString());
+        result.put("to", (to == null ? simulatedTime.toLocalDate() : to).toString());
+        result.put("retentionMonths", parkingHistoryRepository.getRetentionMonths());
+        result.put("enteredCount", records.size());
+        result.put("exitedCount", records.stream().filter(ParkingHistoryRecord::hasExited).count());
+        result.put("currentlyParkedCount", records.stream().filter(r -> !r.hasExited()).count());
+        result.put("totalRevenue", records.stream().mapToDouble(ParkingHistoryRecord::getFee).sum());
+        result.put("records", items);
+        return result;
+    }
 
     // [OOP: METHOD] Method createReservation() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
     public synchronized Map<String, Object> createReservation(String licensePlate, VehicleType type,
