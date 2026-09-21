@@ -26,6 +26,7 @@ jobs:
           find src -name '*.java' -print > sources.txt
           javac -encoding UTF-8 -d bin @sources.txt
           java -cp bin test.ParkingSystemTest
+          java -cp bin test.PlatformRecoveryTest
           node tests/platform-core.test.cjs
           python tests/test_platform.py bin
 
@@ -69,7 +70,7 @@ jobs:
           scp -i ~/.ssh/aws_deploy_key /tmp/parking-platform.tar.gz /tmp/parking-platform.env "$AWS_USER@$AWS_HOST:/tmp/"
           ssh -i ~/.ssh/aws_deploy_key "$AWS_USER@$AWS_HOST" 'set -eu
             cd /opt/parking-platform
-            find . -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf {} +
+            find . -mindepth 1 -maxdepth 1 ! -name .env ! -name backups -exec rm -rf {} +
             tar -xzf /tmp/parking-platform.tar.gz
             install -m 600 /tmp/parking-platform.env .env
             docker compose -f compose.aws.yml up -d --build --remove-orphans

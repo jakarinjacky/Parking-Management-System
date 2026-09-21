@@ -113,6 +113,26 @@ with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
         assert owner.state['sites'][0]['name']=='Configured'
         assert owner.state['sites'][0]['memberships'][0]['room']=='101'
         assert len(owner.state['sites'])==4
+        # Account changes preserve business data and invalidate existing sessions.
+        staff=Client(); staff.login('staff')
+        owner.request('state')
+        staff_id=next(u['id'] for u in owner.state['users'] if u['username']=='staff')
+        other=Client(); other.login('owner2')
+        other.command('setUserActive',expected=403,userId=staff_id,active=False)
+        owner.command('setUserActive',userId=staff_id,active=False)
+        staff.request('state',expected=401)
+        Client().request('login',{'username':'staff','password':'DemoPass123!'},expected=403)
+        owner.command('setUserActive',userId=staff_id,active=True)
+        staff=Client(); staff.login('staff')
+        owner.command('revokeSessions',userId=staff_id)
+        staff.request('state',expected=401)
+        owner.command('setUserActive',expected=403,userId=owner.state['user']['id'],active=False)
+        owner.command('changePassword',expected=403,currentPassword='WrongPassword123!',newPassword='ChangedPassword123!')
+        owner.command('changePassword',currentPassword='DemoPass123!',newPassword='ChangedPassword123!')
+        owner.request('state',expected=401)
+        owner.request('login',{'username':'owner','password':'ChangedPassword123!'})
+        assert len(owner.state['sites'])==4
+        assert 'ChangedPassword123!' not in json.dumps(owner.state)
         print('Platform HTTP PASS: tenant isolation, roles, layouts, publication guards, transactions, reservations, users, XLSX source data, restart persistence')
     finally:
         process.terminate(); process.wait(timeout=5)

@@ -101,14 +101,14 @@ Cookie แยกจากระบบเดิม เป็น HttpOnly + SameSi
 
 ## สิ่งที่ยังไม่ทำ / ห้ามนำไปโฆษณาว่ารองรับแล้ว
 
-1. ฐานข้อมูล SQL, migration ข้อมูลลานเดิม, transaction ข้ามหลาย server
+1. มี PostgreSQL JSONB + PlatformStore แล้ว; ยังขาด migration ข้อมูลลานเดิมและ transaction ข้ามหลาย server
 2. สมาชิกอัตโนมัติ/โควตาคอนโด, visitor approval, คูปองห้าง, Valet/PMS โรงแรม
 3. กฎราคาวันหยุด รายวัน แยกประเภทรถ ส่วนลด และเก็บค่า EV ตามพลังงาน
 4. ถนนเวกเตอร์โค้งอิสระ ความกว้างตามเมตร การตรวจรัศมีเลี้ยว ทางลาดเชื่อมชั้น
 5. กล้องจริง/ANPR จริง ESP32 จริง ไม้กั้นจริง heartbeat และ fail-safe
 6. Payment Gateway, Subscription billing, จำกัดแพ็กเกจ, ใบกำกับภาษี
 7. เปลี่ยนโลโก้/ธีมต่อบริษัท และ RBAC แบบสร้าง role เอง
-8. กู้รหัสผ่าน MFA จัดการปิดบัญชี session revoke รายบัญชี และ security review
+8. มีเปลี่ยนรหัสด้วยรหัสเดิม กู้ superadmin ผ่าน console ปิดบัญชี และ session revoke แล้ว (ดู ACCOUNT_RECOVERY_TH.md); ยังขาด email recovery, MFA และ security review
 9. Automated backup/restore, monitoring/alerts และ scheduled retention ตอนระบบไม่มีผู้ใช้
 10. เอกสารและขั้นตอนคุ้มครองข้อมูลส่วนบุคคลสำหรับการใช้งานจริง
 

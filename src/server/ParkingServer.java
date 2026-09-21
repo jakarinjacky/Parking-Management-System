@@ -112,7 +112,12 @@ public class ParkingServer {
         if (platformOnly) server.createContext("/", new StaticFileHandler());
         else registerRoutes();
         // Platform keeps its own tenant-scoped store/session; legacy data is not migrated implicitly.
-        server.createContext("/api/platform", new platform.PlatformHandler());
+        boolean platformConfigured = platformOnly
+                || "true".equalsIgnoreCase(System.getenv("PLATFORM_DEMO"))
+                || System.getenv("PLATFORM_ADMIN_PASSWORD") != null
+                || System.getenv("PLATFORM_DATA_DIR") != null
+                || System.getenv("DATABASE_URL") != null;
+        if (platformConfigured) server.createContext("/api/platform", new platform.PlatformHandler());
     }
 
     /**
