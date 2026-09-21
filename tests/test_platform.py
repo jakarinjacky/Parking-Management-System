@@ -18,8 +18,10 @@ class Client:
         self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
         self.state = None
 
-    def request(self, path, body=None, expected=200, origin=None):
+    def request(self, path, body=None, expected=200, origin=None, authorization=None):
         headers = {'Content-Type': 'application/json'}
+        if authorization:
+            headers['Authorization'] = authorization
         if origin:
             headers['Origin'] = origin
         req = urllib.request.Request('http://localhost:8080/api/platform/' + path,
@@ -42,7 +44,7 @@ class Client:
         return self.request('command', {'action': action, 'revision': self.state['revision'], **kwargs}, expected)
 
 with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
-    env = dict(os.environ, PLATFORM_DEMO='true', PLATFORM_DATA_DIR=str(Path(temporary) / 'platform'))
+    env = dict(os.environ, PLATFORM_DEMO='true', PLATFORM_DEVICE_GATEWAY='true', PLATFORM_DATA_DIR=str(Path(temporary) / 'platform'))
     def start():
         process = subprocess.Popen(['java', '-cp', CLASSES, 'server.ParkingServer'], cwd=temporary, env=env,
                                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -143,6 +145,23 @@ with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
         owner.command('checkout',siteId=hotel['id'],ticketId=ticket['ticketId'])
         owner.command('addRoadCurve',siteId=sid,label='Curve',floor=1,width=6,x1=10,y1=10,cx=80,cy=10,x2=80,y2=80)
         owner.command('addRoadCurve',expected=400,siteId=sid,label='Invalid',floor=1,width=6,x1=-1,y1=10,cx=80,cy=10,x2=80,y2=80)
+        owner.command('addDevice',siteId=sid,name='Bench',type='ESP32')
+        device=next(s for s in owner.state['sites'] if s['id']==sid)['devices'][-1]
+        staff.command('provisionDevice',expected=403,siteId=sid,deviceId=device['id'])
+        owner.command('provisionDevice',siteId=sid,deviceId=device['id'])
+        device_token=owner.state['deviceSecret']
+        event={'siteId':sid,'deviceId':device['id'],'type':'HEARTBEAT'}
+        Client().request('device',event,expected=403)
+        Client().request('device',event,authorization='Bearer '+device_token)
+        owner.request('state')
+        assert 'deviceSecret' not in owner.state and 'tokenHash' not in json.dumps(owner.state)
+        owner.command('queueLed',siteId=sid,deviceId=device['id'])
+        response=Client().request('device',event,authorization='Bearer '+device_token)
+        ack={**event,'type':'ACK','commandId':response['command']['id']}
+        Client().request('device',ack,authorization='Bearer '+device_token)
+        Client().request('device',ack,authorization='Bearer '+device_token)
+        owner.command('disableDevice',siteId=sid,deviceId=device['id'])
+        Client().request('device',event,expected=403,authorization='Bearer '+device_token)
         owner.request('state')
         staff_id=next(u['id'] for u in owner.state['users'] if u['username']=='staff')
         other=Client(); other.login('owner2')

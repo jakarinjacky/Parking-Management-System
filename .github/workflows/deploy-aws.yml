@@ -78,7 +78,11 @@ jobs:
           scp -i ~/.ssh/aws_deploy_key /tmp/parking-platform.tar.gz /tmp/parking-platform.env "$AWS_USER@$AWS_HOST:/tmp/"
           ssh -i ~/.ssh/aws_deploy_key "$AWS_USER@$AWS_HOST" 'set -eu
             cd /opt/parking-platform
-            if test -f compose.aws.yml && test -f .env; then bash scripts/backup-postgres.sh; fi
+            if test -f compose.aws.yml && test -f .env; then
+              tar -xOf /tmp/parking-platform.tar.gz ./scripts/backup-postgres.sh > /tmp/parking-backup-before-deploy.sh
+              bash /tmp/parking-backup-before-deploy.sh
+              rm -f /tmp/parking-backup-before-deploy.sh
+            fi
             find . -mindepth 1 -maxdepth 1 ! -name .env ! -name backups -exec rm -rf {} +
             tar -xzf /tmp/parking-platform.tar.gz
             install -m 600 /tmp/parking-platform.env .env
