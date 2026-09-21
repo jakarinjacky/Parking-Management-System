@@ -19,7 +19,11 @@ public final class PlatformHandler implements HttpHandler {
     public PlatformHandler() throws IOException {
         try {
             String directory=System.getenv().getOrDefault("PLATFORM_DATA_DIR","data/platform");
-            service=new PlatformService(Path.of(directory,"platform.json"),"true".equalsIgnoreCase(System.getenv("PLATFORM_DEMO")),System.getenv("PLATFORM_ADMIN_PASSWORD"));
+            String databaseUrl=System.getenv("DATABASE_URL");
+            PlatformStore store=databaseUrl==null||databaseUrl.isBlank()
+                ? new FilePlatformStore(Path.of(directory,"platform.json"))
+                : new PostgresPlatformStore(databaseUrl,System.getenv("DB_USER"),System.getenv("DB_PASSWORD"));
+            service=new PlatformService(store,"true".equalsIgnoreCase(System.getenv("PLATFORM_DEMO")),System.getenv("PLATFORM_ADMIN_PASSWORD"));
         } catch(Exception e) { throw new IOException("Cannot initialize platform store",e); }
     }
     @Override public void handle(HttpExchange exchange) throws IOException {
@@ -27,6 +31,9 @@ public final class PlatformHandler implements HttpHandler {
             String path=exchange.getRequestURI().getPath(),method=exchange.getRequestMethod();
             boolean write=method.equals("POST");
             if(!write&&!method.equals("GET")) { reply(exchange,405,Map.of("error","Method not allowed")); return; }
+            if(path.equals("/api/platform/health")&&method.equals("GET")) {
+                reply(exchange,200,Map.of("status","ok")); return;
+            }
             if(write) {
                 String origin=exchange.getRequestHeaders().getFirst("Origin"),host=exchange.getRequestHeaders().getFirst("Host");
                 if(origin!=null&&!origin.equals("http://"+host)&&!origin.equals("https://"+host)) throw new SecurityException("Cross-origin request rejected");
