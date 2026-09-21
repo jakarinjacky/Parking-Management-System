@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GreenPark • Parking Platform</title>
+  <link rel="stylesheet" href="css/platform.css">
+  <script src="js/platform-core.js" defer></script>
+  <script src="js/history-export.js" defer></script>
+  <script src="js/platform.js" defer></script>
+</head>
+<body>
+  <div id="notice" role="status" aria-live="polite"></div>
+  <section id="loginScreen" class="login-shell">
+    <div class="intro"><span class="eyebrow">GREENPARK / PLATFORM</span><h1>พื้นที่ของคุณ<br>ออกแบบได้เอง<span>.</span></h1><p>สร้างลานจอด วางถนน และจัดการทุกสาขา<br>ในพื้นที่ทำงานเดียว</p><div class="mini-map" aria-hidden="true"><i>P</i><i>P</i><i>EV</i><b>→ → → →</b><i>P</i><i>P</i><i>P</i></div><p class="subtle">CONDO · MALL · HOTEL · CUSTOM</p></div>
+    <div class="login-card"><span class="tag">PLATFORM MVP</span><h2>เข้าสู่พื้นที่ทำงาน</h2><p>บัญชีแพลตฟอร์มแยกจากบัญชีลานเดิม</p>
+      <form id="loginForm"><label>ชื่อผู้ใช้<input name="username" autocomplete="username" required maxlength="40"></label><label>รหัสผ่าน<input name="password" type="password" autocomplete="current-password" required maxlength="128"></label><button class="primary" type="submit">เข้าสู่ระบบ →</button></form>
+      <p id="connectionHint" class="help">เชื่อมต่อกับ Java API บนเซิร์ฟเวอร์เดียวกัน</p>
+      <details><summary>วิธีเริ่มทดลองบนเครื่อง</summary><p>รัน <code>run-platform-demo.bat</code> แล้วเปิด <code>http://localhost:8080/platform.html</code></p><p>บัญชีตัวอย่าง: owner, admin, staff, owner2, superadmin<br>รหัสผ่าน: <code>DemoPass123!</code><br>ใช้เฉพาะข้อมูลสมมุติ ห้ามเปิดโหมดนี้ให้ลูกค้าจริง</p></details>
+      <button id="previewButton" type="button">ดูตัวอย่างหน้าตา (อ่านอย่างเดียว)</button>
+      <a href="index.html">กลับระบบลานเดิม ↗</a>
+    </div>
+  </section>
+  <div id="workspace" class="workspace" hidden>
+    <aside class="sidebar"><a class="brand" href="platform.html"><b>G</b><span>GreenPark<small>Parking platform</small></span></a><div id="nav" class="nav"></div><div class="sidebar-foot"><span class="tag">MVP · v1</span><p>ผัง Grid เป็นแผนผังเชิงตรรกะ<br>ไม่ใช่แบบก่อสร้างรับรอง</p><a href="index.html">ระบบลานเดิม ↗</a></div></aside>
+    <div class="main-shell"><header><div><span class="eyebrow">WORKSPACE</span><select id="sitePicker" aria-label="เลือกลานจอด"></select></div><div class="account"><span id="accountName"></span><button id="refreshButton" title="โหลดข้อมูลล่าสุด">รีเฟรช</button><button id="logoutButton">ออกจากระบบ</button></div></header>
+    <div id="modeBanner" class="mode-banner"></div><main id="main"></main></div>
+  </div>
+  <dialog id="modal"><form id="modalForm"><div id="modalContent"></div><div class="actions"><button type="button" id="cancelModal">ยกเลิก</button><button type="submit" class="primary">บันทึก</button></div></form></dialog>
+  <div hidden><input id="historyFrom"><input id="historyTo"><input id="historyPlate"><span id="historyExportMessage"></span></div>
+</body></html>

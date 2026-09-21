@@ -1,0 +1,8 @@
+bin/
+data/
+sources.txt
+platform-sources.txt
+node_modules/
+test-results/
+playwright-report/
+*.log

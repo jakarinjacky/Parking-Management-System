@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  pull_request:
 
 permissions:
   contents: read
@@ -33,6 +34,11 @@ jobs:
       - name: Check role authorization over HTTP
         # Verify authorization against the real Java HTTP server.
         run: python tests/test_roles.py bin
+
+      - name: Check platform domain and tenant-scoped HTTP workflows
+        run: |
+          node tests/platform-core.test.cjs
+          python tests/test_platform.py bin
 
       - name: Check all JavaScript syntax
         run: |

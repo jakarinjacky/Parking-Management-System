@@ -1,0 +1,75 @@
+// Browser E2E. Requires Playwright and its Chromium browser; uses disposable server data.
+const {chromium}=require('playwright');
+const {spawn}=require('node:child_process');
+const fs=require('node:fs');
+const path=require('node:path');
+const os=require('node:os');
+const assert=require('node:assert/strict');
+const classes=path.resolve(process.argv[2]||'bin');
+const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'platform-browser-'));
+fs.symlinkSync(path.resolve('web'),path.join(tmp,'web'),'dir');
+const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{...process.env,PLATFORM_DEMO:'true',PLATFORM_DATA_DIR:path.join(tmp,'platform')},stdio:'ignore'});
+(async()=>{
+ let browser;
+ try {
+  for(let i=0;i<100;i++){try{const r=await fetch('http://localhost:8080/api/platform/state');if(r.status===401)break;}catch{}await new Promise(r=>setTimeout(r,100));}
+  browser=await chromium.launch({headless:true});
+  const page=await browser.newPage({viewport:{width:1440,height:1000}}), errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  page.on('dialog',d=>d.accept());
+  await page.goto('http://localhost:8080/platform.html');
+  await page.locator('#loginForm [name=username]').fill('owner');
+  await page.locator('#loginForm [name=password]').fill('DemoPass123!');
+  await page.locator('#loginForm button').click();
+  await page.locator('#workspace').waitFor({state:'visible'});
+  await page.screenshot({path:path.join(tmp,'platform-desktop.png'),fullPage:true});
+  await page.locator('[data-action=editSite]').first().click();
+  await page.locator('[data-action=publish]').click();
+  await page.locator('#notice').filter({hasText:'เผยแพร่ผังแล้ว'}).waitFor();
+  await page.locator('[data-nav=operations]').click();
+  await page.locator('[data-action=checkin]').click();
+  await page.locator('#modal [name=plate]').fill('BROWSER-01');
+  await page.locator('#modal [name=slotId]').selectOption('A4');
+  await page.locator('#modal button[type=submit]').click();
+  await page.locator('#modal').waitFor({state:'hidden'});
+  assert(await page.locator('tbody').innerText().then(t=>t.includes('BROWSER-01')));
+  await page.locator('[data-action=checkout]').click();
+  await page.locator('#modal input[type=checkbox]').check();
+  await page.locator('#modal button[type=submit]').click();
+  await page.locator('#modal').waitFor({state:'hidden'});
+  await page.locator('[data-nav=history]').click();
+  const downloading=page.waitForEvent('download');
+  await page.locator('[data-action=export]').click();
+  const download=await downloading; await download.saveAs(path.join(tmp,'history.xlsx'));
+  assert(fs.statSync(path.join(tmp,'history.xlsx')).size>1000);
+  await page.locator('[data-nav=sites]').click();
+  await page.locator('[data-action=createSite]').click();
+  await page.locator('#modal [name=name]').fill('Browser custom');
+  await page.locator('#modal [name=businessType]').selectOption('CUSTOM');
+  await page.locator('#modal button[type=submit]').click();
+  await page.locator('#modal').waitFor({state:'hidden'});
+  for(const [type,x,y]of [['ENTRY',0,0],['ROAD',1,0],['EXIT',2,0],['SLOT',1,1]]){
+   await page.locator(`[data-tool=${type}]`).click();
+   await page.locator(`.cell[data-x="${x}"][data-y="${y}"]`).click();
+  }
+  await page.locator('[data-action=publish]').click();
+  await page.locator('#notice').filter({hasText:'เผยแพร่ผังแล้ว'}).waitFor();
+  await page.screenshot({path:path.join(tmp,'platform-editor.png'),fullPage:true});
+  for(const nav of ['members','devices','settings','users','audit'])await page.locator(`[data-nav=${nav}]`).click();
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('[data-nav=sites]').click();
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await page.screenshot({path:path.join(tmp,'platform-mobile.png'),fullPage:true});
+  await page.locator('#logoutButton').click();
+  await page.locator('#loginScreen').waitFor({state:'visible'});
+  await page.locator('#loginForm [name=username]').fill('staff');
+  await page.locator('#loginForm [name=password]').fill('DemoPass123!');
+  await page.locator('#loginForm button').click();
+  await page.locator('#workspace').waitFor({state:'visible'});
+  assert.equal(await page.locator('[data-nav=editor]').count(),0);
+  assert.equal(await page.locator('[data-nav=history]').count(),0);
+  assert.deepEqual(errors,[]);
+  console.log('Browser PASS: login, publish, parking, cash checkout, XLSX, custom road layout, all tabs, mobile, staff permissions');
+  console.log('QA artifacts: '+tmp);
+ } finally {if(browser)await browser.close();server.kill('SIGTERM');}
+})().catch(e=>{console.error(e);process.exitCode=1;});
