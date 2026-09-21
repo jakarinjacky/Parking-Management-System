@@ -39,7 +39,7 @@
         render();
     }
     function heading(title,subtitle,actions='') { return `<div class="page-title"><div><span class="eyebrow">GREENPARK / ${escape(tab.toUpperCase())}</span><h1>${title}</h1><p>${subtitle}</p></div><div class="actions">${actions}</div></div>`; }
-    function button(action,label,primary=false,disabled=false,extra='') { return `<button data-action="${action}" class="${primary?'primary':''}" ${disabled?'disabled':''} ${extra}>${label}</button>`; }
+    function button(action,label,primary=false,disabled=false,extra='') { return `<button type="button" data-action="${action}" class="${primary?'primary':''}" ${disabled?'disabled':''} ${extra}>${label}</button>`; }
     function empty(text) { return `<div class="empty">${text}</div>`; }
     function metric(label,value) { return `<div class="metric"><span>${label}</span><strong>${value}</strong></div>`; }
     function table(headers,rows) { return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`; }
@@ -114,7 +114,11 @@
     function select(name,label,values,selected='') { return `<label>${label}<select name="${name}">${options(values,selected)}</select></label>`; }
     function modal(title,html,fn) { $('modalContent').innerHTML=`<h2>${title}</h2>${html}`; modalSubmit=fn; $('modal').showModal(); }
     async function safely(fn) { try {await fn();} catch(e) { notice(e.message,true); } }
-    function siteOptions() { return Object.fromEntries((current()?.published||[]).filter(c=>c.type==='SLOT').map(c=>[c.id,`${c.label} • ${C.slotTypes[c.slotType]}`])); }
+    function siteOptions(vehicleType) {
+        const s=current();
+        const taken=new Set((s?.tickets||[]).filter(t=>t.status==='ACTIVE').map(t=>t.slotId));
+        return Object.fromEntries((s?.published||[]).filter(c=>c.type==='SLOT'&&!taken.has(c.id)&&(!vehicleType||C.compatible(vehicleType,c.slotType))).map(c=>[c.id,`${c.label} • ${C.slotTypes[c.slotType]}`]));
+    }
     async function action(name,element) {
         const s=current();
         if(name==='openSite'||name==='editSite') { if(!checkDirty())return; siteId=element.dataset.id; tab=name==='editSite'?'editor':'operations';loadDraft();showWorkspace(); }
@@ -131,13 +135,18 @@
         if(name==='undo'&&undo.length&&!preview) {redo.push(C.clone(draft));draft=undo.pop();dirty=true;selected='';render();}
         if(name==='redo'&&redo.length&&!preview) {undo.push(C.clone(draft));draft=redo.pop();dirty=true;selected='';render();}
         if(name==='deleteCell') mutate(()=>{draft=draft.filter(c=>c.id!==selected);selected='';});
-        if(name==='checkin') modal('รับรถเข้าลาน',field('plate','ทะเบียน')+select('vehicleType','ประเภทรถ',{CAR:'รถยนต์',ELECTRIC_VEHICLE:'EV',MOTORCYCLE:'มอเตอร์ไซค์',TRUCK:'รถใหญ่'})+select('slotId','ช่องจอด',siteOptions()),f=>command('checkin',Object.fromEntries(f)));
+        if(name==='checkin') {
+            modal('รับรถเข้าลาน',field('plate','ทะเบียน')+select('vehicleType','ประเภทรถ',{CAR:'รถยนต์',ELECTRIC_VEHICLE:'EV',MOTORCYCLE:'มอเตอร์ไซค์',TRUCK:'รถใหญ่'})+select('slotId','ช่องว่างที่เหมาะกับรถ',siteOptions('CAR'))+'<p class="help">แสดงเฉพาะช่องว่างตามประเภทรถ เซิร์ฟเวอร์ตรวจการจองอีกครั้งก่อนรับรถ</p>',f=>command('checkin',Object.fromEntries(f)));
+            const vehicle=$('modal').querySelector('[name=vehicleType]'), slot=$('modal').querySelector('[name=slotId]');
+            const update=()=>{const available=siteOptions(vehicle.value);slot.innerHTML=Object.keys(available).length?options(available):'<option value="">ไม่มีช่องว่างสำหรับรถประเภทนี้</option>';slot.required=true;};
+            vehicle.onchange=update;update();
+        }
         if(name==='checkout') {const t=s.tickets.find(t=>t.ticketId===element.dataset.id);modal('ยืนยันรับเงินสดและนำรถออก',`<p>ทะเบียน ${escape(t.licensePlate)} · ช่อง ${escape(t.slotNumber)}</p><h2>${money(fee(t))}</h2><p>ยอดประมาณการ ณ ตอนนี้ เซิร์ฟเวอร์คำนวณอีกครั้งเมื่อยืนยัน ยังไม่มี Payment Gateway หรือคำสั่งเปิดไม้กั้น</p><label class="check-label"><input type="checkbox" required>รับเงินสดเรียบร้อยแล้ว / ไม่มีค่าบริการ</label>`,()=>command('checkout',{ticketId:t.ticketId}));}
         if(name==='member')modal('เพิ่มสมาชิก',field('name','ชื่อสมาชิก')+field('plate','ทะเบียน')+field('room','เลขห้อง / หน่วยงาน')+field('expires','วันหมดอายุ','date'),f=>command('addMember',Object.fromEntries(f)));
         if(name==='reserve')modal('จองช่องล่วงหน้า',field('plate','ทะเบียน')+select('slotId','ช่องจอด',siteOptions())+field('from','เริ่ม','datetime-local')+field('to','สิ้นสุด','datetime-local'),f=>command('reserve',{plate:f.get('plate'),slotId:f.get('slotId'),from:new Date(f.get('from')).toISOString(),to:new Date(f.get('to')).toISOString()}));
         if(name==='cancelReservation') {if(!confirm('ยกเลิกการจองนี้?'))return;await command('cancelReservation',{reservationId:element.dataset.id});showWorkspace();}
         if(name==='device')modal('ทะเบียนอุปกรณ์ (ยังไม่เชื่อมต่อ)',field('name','ชื่อ / ตำแหน่ง')+select('type','ชนิด',{CAMERA:'กล้อง',ESP32:'ESP32',SENSOR:'เซนเซอร์',BARRIER:'ไม้กั้น'}),f=>command('addDevice',Object.fromEntries(f)));
-        if(name==='filter') {filters={from:$('filterFrom').value,to:$('filterTo').value,plate:$('filterPlate').value.trim()};if(filters.from&&filters.to&&filters.from>filters.to)throw new Error('วันที่เริ่มต้องไม่เกินวันที่สิ้นสุด');render();}
+        if(name==='filter') {const next={from:$('filterFrom').value,to:$('filterTo').value,plate:$('filterPlate').value.trim()};if(next.from&&next.to&&next.from>next.to)throw new Error('วันที่เริ่มต้องไม่เกินวันที่สิ้นสุด');filters=next;render();}
         if(name==='export') {for(const [id,value]of [['historyFrom',filters.from],['historyTo',filters.to],['historyPlate',filters.plate]])$(id).value=value;window.setHistoryExportRecords(historyRows());window.exportParkingHistory();notice($('historyExportMessage').textContent);}
     }
     $('main').addEventListener('click',e=>{const target=e.target.closest('button');if(!target)return;if(target.dataset.action)safely(()=>action(target.dataset.action,target));if(target.dataset.tool){tool=target.dataset.tool;render();}if(target.dataset.x!==undefined){if(tab==='editor')putCell(Number(target.dataset.x),Number(target.dataset.y),tool);else if(tab==='operations'&&target.dataset.cell){routeIds=C.route(current().published,target.dataset.cell);render();}}});

@@ -60,6 +60,12 @@
         const sites=['CONDO','MALL','HOTEL'].map((type,i)=>({id:`preview-${i}`,tenantId:'preview',name:['Green Residence','Green Avenue Mall','Grey Garden Hotel'][i],businessType:type,address:'ข้อมูลตัวอย่างสำหรับดูหน้าตา',active:true,rate:20,freeMinutes:15,draft:template(type),published:template(type),versions:[],tickets:[],memberships:[],reservations:[],devices:[],features:{membership:true,reservation:true}}));
         return {revision:0,user:{username:'Preview',role:'owner',tenantId:'preview',siteIds:[]},tenants:[{id:'preview',name:'GreenPark • ตัวอย่าง',plan:'trial'}],users:[],audit:[],sites};
     }
-    root.PlatformCore={templates,types,slotTypes,clone,route,validate,template,preview};
+    function compatible(vehicle,slot) {
+        if(slot==='MOTORCYCLE'||vehicle==='MOTORCYCLE') return slot==='MOTORCYCLE'&&vehicle==='MOTORCYCLE';
+        if(vehicle==='TRUCK') return slot==='LARGE';
+        if(slot==='EV_CHARGING') return vehicle==='ELECTRIC_VEHICLE';
+        return ['CAR','ELECTRIC_VEHICLE'].includes(vehicle);
+    }
+    root.PlatformCore={templates,types,slotTypes,clone,route,validate,template,preview,compatible};
     if(typeof module!=='undefined') module.exports=root.PlatformCore;
 })(typeof window==='undefined'?globalThis:window);
