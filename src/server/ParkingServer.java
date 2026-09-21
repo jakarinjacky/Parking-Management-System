@@ -53,10 +53,11 @@ import util.SimpleJson;
  */
 // [OOP: CLASS] คลาส: แม่แบบสำหรับสร้างออบเจ็กต์และรวมข้อมูลกับพฤติกรรมไว้ด้วยกัน
 public class ParkingServer {
-    private static final int PORT = 8080; // พอร์ตสำหรับรันเซิร์ฟเวอร์
+    private static final int PORT = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080")); // พอร์ตสำหรับรันเซิร์ฟเวอร์
     private final ParkingService parkingService; // Business Logic Service หลักของระบบ
     private final HttpServer server; // อินสแตนซ์ของ HTTP Server
     private final Path webRoot; // โฟลเดอร์ต้นทางสำหรับเก็บไฟล์ Frontend
+    private final boolean platformOnly = Boolean.parseBoolean(System.getenv().getOrDefault("PLATFORM_ONLY", "false"));
     private final Map<String, EmployeeSession> activeSessions = new ConcurrentHashMap<>();
 
     private static final Map<String, EmployeeAccount> SYSTEM_USERS = new HashMap<>();
@@ -108,7 +109,8 @@ public class ParkingServer {
         this.server = HttpServer.create(new InetSocketAddress(PORT), 0);
 
         // ลงทะเบียนเส้นทาง (Routes) API และ Web Handler
-        registerRoutes();
+        if (platformOnly) server.createContext("/", new StaticFileHandler());
+        else registerRoutes();
         // Platform keeps its own tenant-scoped store/session; legacy data is not migrated implicitly.
         server.createContext("/api/platform", new platform.PlatformHandler());
     }
@@ -1192,6 +1194,12 @@ public class ParkingServer {
         // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             String path = exchange.getRequestURI().getPath();
+            if (platformOnly && (path == null || path.equals("/") || path.isEmpty()
+                    || path.equals("/index.html") || path.equals("/login.html"))) {
+                exchange.getResponseHeaders().set("Location", "/platform.html");
+                exchange.sendResponseHeaders(302, -1);
+                return;
+            }
             if (path == null || path.equals("/") || path.isEmpty()) {
                 if (!isAuthenticated(exchange)) {
                     redirectToLogin(exchange);
