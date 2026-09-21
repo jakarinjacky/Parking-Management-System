@@ -2,6 +2,10 @@
 
 ระบบบริหารจัดการลานจอดรถอัจฉริยะ (Smart Parking Management System) ที่ออกแบบและพัฒนาตามหลักการ **Object-Oriented Programming (OOP)**, **SOLID Principles**, และ **Design Patterns** อย่างเข้มข้น ครอบคลุมทั้งฝั่ง Domain Logic, Service Layer, Embedded REST API Server และ Modern Interactive Web Interface
 
+## AWS + PostgreSQL deployment
+
+แพลตฟอร์มสามารถรันด้วย PostgreSQL และ Docker บน AWS EC2 ได้ ดูขั้นตอนภาษาไทยที่ [docs/AWS_FREE_TIER_DEPLOY_TH.md](docs/AWS_FREE_TIER_DEPLOY_TH.md) โดย workflow `.github/workflows/deploy-aws.yml` รองรับการ deploy ครั้งแรกแบบ manual และ deploy อัตโนมัติจาก `main` หลังตั้งค่า `AWS_DEPLOY_ENABLED=true`
+
 ---
 
 ## 🌟 จุดเด่นและสถาปัตยกรรม OOP (Key Highlights)
