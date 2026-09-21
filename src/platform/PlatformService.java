@@ -15,6 +15,22 @@ import util.SimpleJson;
 public final class PlatformService {
     private final PlatformStore store;
     private Map<String,Object> state;
+    private int transactionDepth;
+    public synchronized <T> T atomic(java.util.concurrent.Callable<T> action) {
+        try {
+            if(transactionDepth>0) return action.call();
+            return store.transaction(()->{
+                String saved=store.load();
+                if(saved!=null&&!saved.isBlank()) state=map(Json.parse(saved));
+                String before=state==null?null:SimpleJson.toJson(state);
+                transactionDepth++;
+                try { return action.call(); }
+                catch(Exception e) { if(before!=null) state=map(Json.parse(before)); throw e; }
+                finally { transactionDepth--; }
+            });
+        } catch(RuntimeException e) { throw e; }
+        catch(Exception e) { throw new IllegalStateException("Platform transaction failed",e); }
+    }
     public static final Set<String> BUSINESSES=Set.of("CONDO","MALL","HOTEL","OFFICE","HOSPITAL","SCHOOL","PUBLIC","EVENT","CUSTOM");
     public static final Set<String> ROLES=Set.of("super_admin","owner","admin","staff");
     public PlatformService(Path file, boolean demo, String adminPassword) throws Exception {
@@ -22,6 +38,9 @@ public final class PlatformService {
     }
     public PlatformService(PlatformStore store, boolean demo, String adminPassword) throws Exception {
         this.store=store;
+        atomic(()->{ initialize(demo,adminPassword); return null; });
+    }
+    private void initialize(boolean demo,String adminPassword) throws Exception {
         String saved=store.load();
         if(saved!=null&&!saved.isBlank()) { state=map(Json.parse(saved)); return; }
         state=new LinkedHashMap<>(Map.of("revision",0,"tenants",new ArrayList<>(),"sites",new ArrayList<>(),"users",new ArrayList<>(),"audit",new ArrayList<>()));
@@ -81,6 +100,9 @@ public final class PlatformService {
         list(state,"users").add(new LinkedHashMap<>(Map.of("id",id(),"username",username,"role",role,"tenantId",tenant,"siteIds",new ArrayList<>(sites),"salt",salt,"hash",hash(password,salt))));
     }
     public synchronized String login(String username,String password) {
+        return atomic(()->loginLocked(username,password));
+    }
+    private String loginLocked(String username,String password) {
         if(username==null||password==null||password.length()>128) throw new SecurityException("ข้อมูลเข้าสู่ระบบไม่ถูกต้อง");
         var u=list(state,"users").stream().filter(v->v.get("username").equals(username)).findFirst().orElse(null);
         String salt=u==null?"AAAAAAAAAAAAAAAAAAAAAA==":u.get("salt").toString();
@@ -93,6 +115,9 @@ public final class PlatformService {
     }
     private boolean superUser(Map<String,Object> u) { return u.get("role").equals("super_admin"); }
     public synchronized int sessionVersion(String userId) {
+        return atomic(()->sessionVersionLocked(userId));
+    }
+    private int sessionVersionLocked(String userId) {
         var u=user(userId);
         if(Boolean.FALSE.equals(u.get("active"))) throw new SecurityException("บัญชีถูกปิดใช้งาน");
         return ((Number)u.getOrDefault("authVersion",0)).intValue();
@@ -108,6 +133,9 @@ public final class PlatformService {
     }
     /** Offline recovery: stop every app instance first; preserves all business data. */
     public synchronized void recoverAdmin(String password) throws Exception {
+        atomic(()->{recoverAdminLocked(password);return null;});
+    }
+    private void recoverAdminLocked(String password) throws Exception {
         String before=SimpleJson.toJson(state);
         try {
             var admin=list(state,"users").stream().filter(u->u.get("username").equals("superadmin")&&superUser(u)).findFirst().orElseThrow(()->new IllegalArgumentException("superadmin not found"));
@@ -130,12 +158,16 @@ public final class PlatformService {
         var result=new LinkedHashMap<>(u); result.remove("salt"); result.remove("hash"); return result;
     }
     public synchronized Map<String,Object> view(String userId) {
+        return atomic(()->viewLocked(userId));
+    }
+    private Map<String,Object> viewLocked(String userId) {
         var u=user(userId);
         purgeExpiredHistory();
         String cutoff=ZonedDateTime.now(ZoneOffset.UTC).minusMonths(3).toInstant().toString();
         List<Map<String,Object>> sites=new ArrayList<>();
         for(var site:list(state,"sites")) if(access(u,site)) {
             var copy=map(Json.parse(SimpleJson.toJson(site)));
+            copy.put("devices",list(site,"devices").stream().map(DeviceGateway::publicView).toList());
             list(copy,"tickets").removeIf(t->!t.get("status").equals("ACTIVE")&&t.get("exitTime").toString().compareTo(cutoff)<0);
             if(u.get("role").equals("staff")) {
                 list(copy,"tickets").removeIf(t->!t.get("status").equals("ACTIVE"));
@@ -156,6 +188,14 @@ public final class PlatformService {
         for(var site:list(state,"sites")) changed|=list(site,"tickets").removeIf(t->!t.get("status").equals("ACTIVE")&&t.get("exitTime").toString().compareTo(cutoff)<0);
         if(changed) try { state.put("revision",((Number)state.get("revision")).intValue()+1); persist(); }
         catch(Exception e) { state=map(Json.parse(before)); throw new IllegalStateException("History retention save failed",e); }
+    }
+    public synchronized void maintenance() { atomic(()->{purgeExpiredHistory();return null;}); }
+    public synchronized Map<String,Object> deviceEvent(String token,Map<String,Object> request) {
+        return atomic(()->{
+            var s=list(state,"sites").stream().filter(v->v.get("id").equals(string(request,"siteId"))).findFirst().orElseThrow(()->new SecurityException("Device authentication failed"));
+            var d=list(s,"devices").stream().filter(v->v.get("id").equals(string(request,"deviceId"))).findFirst().orElseThrow(()->new SecurityException("Device authentication failed"));
+            var result=DeviceGateway.event(d,token,request); persist(); return result;
+        });
     }
     private void addTenant(String id,String name,String plan) { list(state,"tenants").add(new LinkedHashMap<>(Map.of("id",id,"name",name,"plan",plan))); }
     private Map<String,Object> createSite(String tenant,String name,String type) {
@@ -181,11 +221,15 @@ public final class PlatformService {
     }
     /** Transaction method: all role checks, validation and persistence succeed or the old state is restored. */
     public synchronized Map<String,Object> command(String userId,Map<String,Object> request) throws Exception {
+        return atomic(()->commandLocked(userId,request));
+    }
+    private Map<String,Object> commandLocked(String userId,Map<String,Object> request) throws Exception {
         String before=SimpleJson.toJson(state);
         try {
             var u=user(userId); String action=string(request,"action");
             if(integer(request,"revision",0,Integer.MAX_VALUE)!=((Number)state.get("revision")).intValue()) throw new ConcurrentModificationException("มีข้อมูลใหม่ กรุณารีเฟรชก่อนบันทึก");
             String tenant=u.get("tenantId").toString(), siteId="";
+            String deviceSecret=null;
             if(action.equals("changePassword")) {
                 login(u.get("username").toString(),password(request,"currentPassword"));
                 setPassword(u,password(request,"newPassword"));
@@ -216,9 +260,53 @@ public final class PlatformService {
                 addUser(string(request,"username"),string(request,"password"),role,tenant,assigned);
             } else {
                 siteId=string(request,"siteId"); var s=site(u,siteId); tenant=s.get("tenantId").toString();
-                if(Set.of("saveLayout","publish","restore","configure").contains(action)) require(owner(u));
-                else if(!Set.of("checkin","checkout").contains(action)) require(!u.get("role").equals("staff"));
+                if(Set.of("saveLayout","publish","restore","configure","configurePolicy","addRoadCurve","removeRoadCurve").contains(action)) require(owner(u));
+                else if(!Set.of("checkin","checkout","requestVisitor","valet").contains(action)) require(!u.get("role").equals("staff"));
                 switch(action) {
+                    case "addRoadCurve" -> {
+                        var curves=collection(s,"roadCurves"); if(curves.size()>=100) throw new IllegalArgumentException("ไม่เกิน 100 เส้น");
+                        var curve=new LinkedHashMap<String,Object>(Map.of("id",id(),"label",string(request,"label"),"floor",integer(request,"floor",1,8),"width",integer(request,"width",2,12)));
+                        for(String key:List.of("x1","y1","cx","cy","x2","y2")) curve.put(key,integer(request,key,0,100));
+                        if(curve.get("x1").equals(curve.get("x2"))&&curve.get("y1").equals(curve.get("y2"))) throw new IllegalArgumentException("จุดเริ่มและจุดจบต้องต่างกัน");
+                        curves.add(curve);
+                    }
+                    case "removeRoadCurve" -> collection(s,"roadCurves").removeIf(c->c.get("id").equals(string(request,"curveId")));
+                    case "provisionDevice", "disableDevice", "queueLed" -> {
+                        require(owner(u));
+                        if(!"true".equalsIgnoreCase(System.getenv("PLATFORM_DEVICE_GATEWAY"))) throw new IllegalArgumentException("เปิด gateway หลังตั้ง HTTPS ก่อน");
+                        var device=list(s,"devices").stream().filter(d->d.get("id").equals(string(request,"deviceId"))).findFirst().orElseThrow();
+                        if(action.equals("provisionDevice")) deviceSecret=DeviceGateway.provision(device);
+                        else if(action.equals("queueLed")) DeviceGateway.queueLed(device);
+                        else {device.remove("tokenHash");device.remove("lastSeen");device.remove("ledCommand");device.put("mode","DISABLED");}
+                    }
+                    case "configurePolicy" -> s.put("policy",PricingPolicy.validate(map(request.get("policy"))));
+                    case "requestVisitor" -> {
+                        var visitors=collection(s,"visitors");
+                        Instant expires=Instant.parse(string(request,"expires"));
+                        if(!expires.isAfter(Instant.now())||expires.isAfter(Instant.now().plusSeconds(7*86400))) throw new IllegalArgumentException("สิทธิ์ผู้มาติดต่อไม่เกิน 7 วัน");
+                        visitors.add(new LinkedHashMap<>(Map.of("id",id(),"plate",string(request,"plate"),"room",string(request,"room"),"expires",expires.toString(),"status","PENDING","requestedBy",u.get("username"))));
+                    }
+                    case "approveVisitor" -> {
+                        var visitor=collection(s,"visitors").stream().filter(v->v.get("id").equals(string(request,"visitorId"))).findFirst().orElseThrow();
+                        if(!visitor.get("status").equals("PENDING")) throw new IllegalArgumentException("คำขอนี้ดำเนินการแล้ว");
+                        visitor.put("status",Boolean.TRUE.equals(request.get("approved"))?"APPROVED":"REJECTED"); visitor.put("approvedBy",u.get("username"));
+                    }
+                    case "applyCoupon" -> {
+                        require(s.get("businessType").equals("MALL"));
+                        var ticket=list(s,"tickets").stream().filter(t->t.get("ticketId").equals(string(request,"ticketId"))&&t.get("status").equals("ACTIVE")).findFirst().orElseThrow();
+                        String code=string(request,"code");
+                        if(collection(s,"coupons").stream().anyMatch(c->c.get("code").equals(code))||ticket.containsKey("couponCode")) throw new IllegalArgumentException("คูปองหรือตั๋วนี้ใช้ส่วนลดแล้ว");
+                        int percent=integer(request,"percent",1,100);
+                        ticket.put("couponCode",code); ticket.put("couponDiscountPercent",percent);
+                        collection(s,"coupons").add(new LinkedHashMap<>(Map.of("code",code,"ticketId",ticket.get("ticketId"),"percent",percent,"verifiedBy",u.get("username"),"at",now())));
+                    }
+                    case "valet" -> {
+                        require(s.get("businessType").equals("HOTEL"));
+                        var ticket=list(s,"tickets").stream().filter(t->t.get("ticketId").equals(string(request,"ticketId"))&&t.get("status").equals("ACTIVE")).findFirst().orElseThrow();
+                        String stage=string(request,"stage"),previous=ticket.getOrDefault("valetStage","").toString();
+                        if(!(previous.isEmpty()&&stage.equals("RECEIVED")||previous.equals("RECEIVED")&&stage.equals("PARKED")||previous.equals("PARKED")&&stage.equals("RETURNED"))) throw new IllegalArgumentException("ลำดับ Valet ไม่ถูกต้อง");
+                        ticket.put("valetStage",stage); ticket.put("valetStaff",u.get("username")); ticket.put("valetAt",now());
+                    }
                     case "saveLayout" -> s.put("draft",new ParkingLayout(list(request,"cells")).cells());
                     case "publish" -> publish(s);
                     case "restore" -> {
@@ -237,7 +325,10 @@ public final class PlatformService {
                     case "addMember" -> {
                         require(Boolean.TRUE.equals(map(s.get("features")).get("membership")));
                         var member=new LinkedHashMap<String,Object>(Map.of("id",id(),"plate",string(request,"plate"),"name",string(request,"name"),"room",string(request,"room"),"expires",LocalDate.parse(string(request,"expires")).toString()));
-                        list(s,"memberships").removeIf(m->m.get("plate").equals(member.get("plate"))); list(s,"memberships").add(member);
+                        LocalDate starts=request.containsKey("starts")?LocalDate.parse(string(request,"starts")):LocalDate.now(ZoneId.of("Asia/Bangkok"));
+                        if(LocalDate.parse(member.get("expires").toString()).isBefore(starts)) throw new IllegalArgumentException("วันสิ้นสุดต้องไม่น้อยกว่าวันเริ่ม");
+                        member.put("starts",starts.toString());
+                        list(s,"memberships").removeIf(m->m.get("plate").toString().equalsIgnoreCase(member.get("plate").toString())); list(s,"memberships").add(member);
                     }
                     case "reserve" -> {
                         require(Boolean.TRUE.equals(map(s.get("features")).get("reservation")));
@@ -262,7 +353,8 @@ public final class PlatformService {
             for(var s:list(state,"sites")) list(s,"tickets").removeIf(t->!t.get("status").equals("ACTIVE")&&t.get("exitTime").toString().compareTo(cutoff)<0);
             list(state,"audit").add(new LinkedHashMap<>(Map.of("id",id(),"tenantId",tenant,"siteId",siteId,"actor",u.get("username"),"action",action,"at",now())));
             if(list(state,"audit").size()>5000) list(state,"audit").remove(0);
-            state.put("revision",((Number)state.get("revision")).intValue()+1); persist(); return view(userId);
+            state.put("revision",((Number)state.get("revision")).intValue()+1); persist();
+            var result=new LinkedHashMap<>(view(userId)); if(deviceSecret!=null) result.put("deviceSecret",deviceSecret); return result;
         } catch(Exception ex) { state=map(Json.parse(before)); throw ex; }
     }
     private void publish(Map<String,Object> site) {
@@ -298,17 +390,29 @@ public final class PlatformService {
         if((slotType.equals("MOTORCYCLE")&&!vehicleType.equals("MOTORCYCLE"))||(vehicleType.equals("MOTORCYCLE")&&!slotType.equals("MOTORCYCLE"))||(vehicleType.equals("TRUCK")&&!slotType.equals("LARGE"))||(slotType.equals("EV_CHARGING")&&!vehicleType.equals("ELECTRIC_VEHICLE"))) throw new IllegalArgumentException("ประเภทรถไม่ตรงกับช่อง");
         if(list(s,"tickets").stream().anyMatch(t->t.get("status").equals("ACTIVE")&&(t.get("licensePlate").toString().equalsIgnoreCase(plate)||t.get("slotId").equals(slotId)))) throw new IllegalArgumentException("ทะเบียนหรือช่องจอดกำลังใช้งาน");
         Instant now=Instant.now();
+        LocalDate today=now.atZone(ZoneId.of("Asia/Bangkok")).toLocalDate();
+        var member=Boolean.TRUE.equals(map(s.get("features")).get("membership"))?list(s,"memberships").stream().filter(m->m.get("plate").toString().equalsIgnoreCase(plate)&&!LocalDate.parse(m.get("expires").toString()).isBefore(today)&&!LocalDate.parse(m.getOrDefault("starts","1970-01-01").toString()).isAfter(today)).findFirst().orElse(null):null;
+        var policy=s.get("policy") instanceof Map?map(s.get("policy")):Map.<String,Object>of();
+        long quota=PricingPolicy.number(policy,"roomQuota",0);
+        if(member!=null&&quota>0&&list(s,"tickets").stream().filter(t->t.get("status").equals("ACTIVE")&&Objects.equals(t.get("memberRoom"),member.get("room"))).count()>=quota) throw new IllegalArgumentException("จำนวนรถในห้อง/หน่วยงานครบโควตาแล้ว");
+        if(member==null&&Boolean.TRUE.equals(policy.get("requireVisitorApproval"))) {
+            var visitor=collection(s,"visitors").stream().filter(v->v.get("status").equals("APPROVED")&&v.get("plate").toString().equalsIgnoreCase(plate)&&Instant.parse(v.get("expires").toString()).isAfter(now)).findFirst().orElseThrow(()->new IllegalArgumentException("ต้องอนุมัติผู้มาติดต่อก่อนรับรถ"));
+            visitor.put("status","USED");
+        }
         if(list(s,"reservations").stream().anyMatch(r->r.get("status").equals("BOOKED")&&r.get("slotId").equals(slotId)&&Instant.parse(r.get("to").toString()).isAfter(now)&&!r.get("plate").equals(plate))) throw new IllegalArgumentException("ช่องนี้มีการจอง กรุณาเลือกช่องอื่น");
         for(var r:list(s,"reservations")) if(r.get("slotId").equals(slotId)&&r.get("plate").equals(plate)&&r.get("status").equals("BOOKED")) r.put("status","ARRIVED");
         var t=new LinkedHashMap<String,Object>(); t.putAll(Map.of("ticketId",id(),"licensePlate",plate,"vehicleType",vehicleType,"slotId",slotId,"slotNumber",slot.get("label"),"floorNumber",slot.get("floor"),"entryTime",now.toString(),"status","ACTIVE","fee",0));
-        t.put("rate",s.get("rate")); t.put("freeMinutes",s.get("freeMinutes")); t.put("sample",false); list(s,"tickets").add(t);
+        t.put("rate",s.get("rate")); t.put("freeMinutes",s.get("freeMinutes")); t.put("sample",false);
+        PricingPolicy.snapshot(s,t,member,now); list(s,"tickets").add(t);
     }
     private void checkout(Map<String,Object>s,Map<String,Object>request) {
         String tid=string(request,"ticketId"); var t=list(s,"tickets").stream().filter(v->v.get("ticketId").equals(tid)).findFirst().orElseThrow(()->new IllegalArgumentException("ไม่พบตั๋ว"));
         if(!t.get("status").equals("ACTIVE")) throw new IllegalArgumentException("ตั๋วนี้ออกแล้ว");
-        long seconds=Math.max(0,Duration.between(Instant.parse(t.get("entryTime").toString()),Instant.now()).getSeconds());
-        int free=((Number)t.get("freeMinutes")).intValue(),rate=((Number)t.get("rate")).intValue();
-        long fee=seconds<=free*60L?0:((seconds-free*60L+3599)/3600)*rate;
+        if(t.containsKey("valetStage")&&!t.get("valetStage").equals("RETURNED")) throw new IllegalArgumentException("ยืนยันส่งคืนรถ Valet ก่อนนำรถออก");
+        long fee=PricingPolicy.fee(t,Instant.now());
         t.put("fee",fee); t.put("status","EXITED"); t.put("exitTime",now()); t.put("paymentMethod","MANUAL_CASH");
+    }
+    private List<Map<String,Object>> collection(Map<String,Object> site,String name) {
+        site.putIfAbsent(name,new ArrayList<>()); return list(site,name);
     }
 }

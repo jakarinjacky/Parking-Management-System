@@ -1,0 +1,9 @@
+[Unit]
+Description=Parking PostgreSQL backup
+After=docker.service
+Requires=docker.service
+[Service]
+Type=oneshot
+User=ec2-user
+WorkingDirectory=/opt/parking-platform
+ExecStart=/usr/bin/bash /opt/parking-platform/scripts/backup-postgres.sh

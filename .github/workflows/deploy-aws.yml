@@ -27,6 +27,7 @@ jobs:
           javac -encoding UTF-8 -d bin @sources.txt
           java -cp bin test.ParkingSystemTest
           java -cp bin test.PlatformRecoveryTest
+          java -cp bin test.PlatformBusinessTest
           node tests/platform-core.test.cjs
           python tests/test_platform.py bin
 
@@ -44,22 +45,29 @@ jobs:
         env:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           PLATFORM_ADMIN_PASSWORD: ${{ secrets.PLATFORM_ADMIN_PASSWORD }}
+          PLATFORM_DOMAIN: ${{ vars.PLATFORM_DOMAIN }}
+          PLATFORM_DEVICE_GATEWAY: ${{ vars.PLATFORM_DEVICE_GATEWAY }}
         run: |
           tar --exclude=.git --exclude=.env --exclude=bin --exclude=data -czf /tmp/parking-platform.tar.gz .
           python - <<'PY'
-          import os
+          import os, re
           from pathlib import Path
+          domain = os.environ.get("PLATFORM_DOMAIN", "").strip()
+          if domain and not re.fullmatch(r"(?=.{1,253}$)[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,63}", domain):
+              raise SystemExit("PLATFORM_DOMAIN must be a DNS hostname")
           values = {
               "DB_PASSWORD": os.environ["DB_PASSWORD"],
               "PLATFORM_ADMIN_PASSWORD": os.environ["PLATFORM_ADMIN_PASSWORD"],
-              "APP_BIND_IP": "0.0.0.0",
+              "APP_BIND_IP": "127.0.0.1" if domain else "0.0.0.0",
               "APP_PORT": "8080",
-              "PLATFORM_SECURE_COOKIE": "false",
+              "PLATFORM_SECURE_COOKIE": "true" if domain else "false",
+              "PLATFORM_DOMAIN": domain,
+              "PLATFORM_DEVICE_GATEWAY": "true" if domain and os.environ.get("PLATFORM_DEVICE_GATEWAY")=="true" else "false",
           }
-          if any("\n" in value or "\r" in value for value in values.values()):
-              raise SystemExit("Deployment secrets must be single-line values")
+          if any(any(c in value for c in "\n\r\x00'") for value in values.values()):
+              raise SystemExit("Deployment values must be single-line without single quotes")
           Path("/tmp/parking-platform.env").write_text(
-              "".join(f"{key}={value}\n" for key, value in values.items()), encoding="utf-8")
+              "".join(f"{key}='{value}'\n" for key, value in values.items()), encoding="utf-8")
           PY
 
       - name: Upload and restart containers
@@ -70,14 +78,28 @@ jobs:
           scp -i ~/.ssh/aws_deploy_key /tmp/parking-platform.tar.gz /tmp/parking-platform.env "$AWS_USER@$AWS_HOST:/tmp/"
           ssh -i ~/.ssh/aws_deploy_key "$AWS_USER@$AWS_HOST" 'set -eu
             cd /opt/parking-platform
+            if test -f compose.aws.yml && test -f .env; then bash scripts/backup-postgres.sh; fi
             find . -mindepth 1 -maxdepth 1 ! -name .env ! -name backups -exec rm -rf {} +
             tar -xzf /tmp/parking-platform.tar.gz
             install -m 600 /tmp/parking-platform.env .env
-            docker compose -f compose.aws.yml up -d --build --remove-orphans
+            if grep -q "^PLATFORM_DOMAIN=.*[a-zA-Z]" .env; then
+              docker compose -f compose.aws.yml -f compose.https.yml up -d --build --remove-orphans
+            else
+              docker compose -f compose.aws.yml up -d --build --remove-orphans
+            fi
+            sudo install -m 644 ops/parking-backup.service ops/parking-backup.timer /etc/systemd/system/
+            sudo systemctl daemon-reload
+            sudo systemctl enable --now parking-backup.timer
             docker compose -f compose.aws.yml ps
             rm -f /tmp/parking-platform.tar.gz /tmp/parking-platform.env'
 
       - name: Verify health
         env:
           AWS_HOST: ${{ secrets.AWS_HOST }}
-        run: curl --fail --retry 12 --retry-delay 5 "http://$AWS_HOST:8080/api/platform/health"
+          PLATFORM_DOMAIN: ${{ vars.PLATFORM_DOMAIN }}
+        run: |
+          if test -n "$PLATFORM_DOMAIN"; then
+            curl --fail --retry 12 --retry-delay 5 "https://$PLATFORM_DOMAIN/api/platform/health"
+          else
+            curl --fail --retry 12 --retry-delay 5 "http://$AWS_HOST:8080/api/platform/health"
+          fi

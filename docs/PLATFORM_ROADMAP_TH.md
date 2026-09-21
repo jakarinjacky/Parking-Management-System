@@ -5,6 +5,20 @@
 
 ## P0 — ก่อนเปิดรับลูกค้าจริง
 
+### รอบ Business / Operations
+
+- [x] Transaction advisory lock + โหลด state ใหม่ ป้องกัน lost update ระหว่างหลาย process
+- [x] กฎราคาและ snapshot, ส่วนลดสมาชิก, โควตาห้อง, visitor approval, คูปองห้าง, Valet
+- [x] Gateway คีย์รายอุปกรณ์, heartbeat, ACK และคำสั่ง LED bench เท่านั้น
+- [x] ถนนโค้งแบบร่างหน่วยเมตร แยกจาก routing Grid (ยังไม่ใช่แบบก่อสร้าง)
+- [x] เตรียม Caddy HTTPS, daily backup timer, isolated restore drill และ scheduled retention
+- [ ] เปิด HTTPS จริง: ต้องมีโดเมน/DNS/พอร์ต 80–443 และทดสอบ certificate
+- [ ] เปิดรับเงินจริง/Subscription: ต้องเลือก provider และ credentials ร้านค้า
+- [ ] ทดสอบ ESP32/กล้อง/ไม้กั้นของลูกค้าจริงพร้อมเซนเซอร์
+
+ขอบเขต/วิธีเปิดใช้งาน/ข้อจำกัดล่าสุดดู [PRODUCT_OPERATIONS_TH.md](PRODUCT_OPERATIONS_TH.md)
+รายการ [x] ในรอบนี้หมายถึงมี implementation ไม่ใช่ยืนยันว่าเปิดใช้งานจริงบน AWS แล้ว
+
 ### รอบ Product foundation — งานที่เพิ่ม
 
 - [x] เปลี่ยนรหัสผ่านโดยยืนยันรหัสเดิม และยกเลิก Session เดิม
