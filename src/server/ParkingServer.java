@@ -109,6 +109,8 @@ public class ParkingServer {
 
         // ลงทะเบียนเส้นทาง (Routes) API และ Web Handler
         registerRoutes();
+        // Platform keeps its own tenant-scoped store/session; legacy data is not migrated implicitly.
+        server.createContext("/api/platform", new platform.PlatformHandler());
     }
 
     /**
