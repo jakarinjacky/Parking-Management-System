@@ -32,7 +32,7 @@
         $('loginScreen').hidden=true; $('workspace').hidden=false;
         if(!state.sites.some(s=>s.id===siteId)) siteId=state.sites[0]?.id||'';
         $('accountName').textContent=`${state.user.username} · ${roles[state.user.role]}`;
-        $('modeBanner').textContent=preview?'ตัวอย่างอ่านอย่างเดียว • ไม่มีการบันทึกหรือควบคุมอุปกรณ์จริง':'MVP • เก็บข้อมูลบน Java Server • ค่าจอดแบบรายชั่วโมง • อุปกรณ์ยังเป็นทะเบียนจำลอง ไม่ส่งคำสั่งจริง';
+        $('modeBanner').textContent=preview?'ตัวอย่างอ่านอย่างเดียว • ไม่มีการบันทึกหรือควบคุมอุปกรณ์จริง':'ทดลองใช้งาน • ราคาและสิทธิ์คำนวณบนเซิร์ฟเวอร์ • อุปกรณ์รองรับ LED bench เมื่อเปิด Gateway';
         $('sitePicker').innerHTML=state.sites.length?options(Object.fromEntries(state.sites.map(s=>[s.id,s.name])),siteId):'<option>ยังไม่มีลานจอด</option>';
         const pages={sites:'▦  ลานจอดทั้งหมด',editor:'▧  ออกแบบผัง',operations:'↔  รถเข้า–ออก',history:'◷  ประวัติ / Excel',members:'◎  สมาชิก / การจอง',devices:'⌁  อุปกรณ์',settings:'⚙  ตั้งค่าลาน',users:'♙  ผู้ใช้ / บริษัท',audit:'≡  บันทึกกิจกรรม'};
         $('nav').innerHTML=Object.entries(pages).filter(([id])=>owner()||!['editor','settings','users','audit'].includes(id)&& (manager()||!['history','members','devices'].includes(id))).map(([id,label])=>`<button data-nav="${id}" class="${id===tab?'active':''}">${label}</button>`).join('');
@@ -69,15 +69,16 @@
             content+=table(['ทะเบียน','ช่อง','เวลาเข้า','เวลาออก','สถานะ','ค่าจอด'],rows.map(t=>[escape(t.licensePlate)+(t.sample?' <span class="tag">SAMPLE</span>':''),escape(t.slotNumber),time(t.entryTime),time(t.exitTime),t.status==='ACTIVE'?'ยังอยู่':'ออกแล้ว',money(t.fee)]));
         } else if(tab==='members') {
             content=heading('สมาชิกและการจอง',`${escape(s.name)} · แม่แบบ ${escape(C.templates[s.businessType][0])}`,button('member','＋ สมาชิก',false,writeDisabled()||!s.features.membership)+button('reserve','＋ จองช่อง',true,writeDisabled()||!s.features.reservation));
-            content+=`<p class="help">สมาชิกเก็บชื่อ ทะเบียน ห้อง/หน่วยงาน และวันหมดอายุเท่านั้น ยังไม่ให้ส่วนลดหรือเปิดไม้กั้นอัตโนมัติ</p><h3>สมาชิก</h3>`+table(['ชื่อ','ทะเบียน','ห้อง / หน่วยงาน','วันหมดอายุ'],s.memberships.map(m=>[escape(m.name),escape(m.plate),escape(m.room),escape(m.expires)]));
+            content+=`<p class="help">ส่วนลดสมาชิก ${s.policy?.memberDiscountPercent||0}% · โควตาต่อห้อง ${s.policy?.roomQuota||'ไม่จำกัด'} คัน · ตรวจสิทธิ์และเก็บราคา ณ เวลาเข้าลาน</p><h3>สมาชิก / ผู้เข้าพัก</h3>`+table(['ชื่อ','ทะเบียน','ห้อง / หน่วยงาน','เริ่ม','หมดอายุ'],s.memberships.map(m=>[escape(m.name),escape(m.plate),escape(m.room),escape(m.starts||'—'),escape(m.expires)]));
+            content+=button('visitor','＋ ขออนุมัติผู้มาติดต่อ',false,writeDisabled())+table(['ทะเบียน','ห้อง','หมดอายุ','สถานะ',''],(s.visitors||[]).map(v=>[escape(v.plate),escape(v.room),time(v.expires),escape(v.status),v.status==='PENDING'?button('approveVisitor','อนุมัติ',false,writeDisabled(),`data-id="${escape(v.id)}"`):'']));
             content+=`<h3 class="section-gap">การจอง</h3>`+table(['ทะเบียน','ช่อง','เริ่ม','สิ้นสุด','สถานะ',''],s.reservations.map(r=>[escape(r.plate),escape(s.published.find(c=>c.id===r.slotId)?.label||r.slotId),time(r.from),time(r.to),escape(r.status),r.status==='BOOKED'?button('cancelReservation','ยกเลิก',false,writeDisabled(),`data-id="${escape(r.id)}"`):'']));
         } else if(tab==='devices') {
-            content=heading('ทะเบียนอุปกรณ์','ข้อมูลแยกตามลาน • ยังไม่มีการเชื่อมต่อหรือสั่งเปิดไม้กั้นจริง',button('device','＋ ลงทะเบียนอุปกรณ์',true,writeDisabled()));
-            content+=table(['ชื่อ','ชนิด','โหมด','สถานะ'],s.devices.map(d=>[escape(d.name),escape(d.type),'SIMULATED','ยังไม่เชื่อมต่อ']));
-            content+=`<div class="card section-gap"><h3>ก่อนเชื่อมอุปกรณ์จริง</h3><p>ต้องเพิ่ม Driver ของผู้ผลิตหรือ ESP32 Gateway พร้อมการยืนยันตัวตน การตอบรับคำสั่ง และเซนเซอร์ป้องกันไม้กั้นหนีบรถ ตำแหน่งกล้องบนผังยังเป็นสัญลักษณ์ ไม่ได้ลงทะเบียนฮาร์ดแวร์โดยอัตโนมัติ</p></div>`;
+            content=heading('อุปกรณ์ / Bench test','Heartbeat จริงเมื่อเปิด Gateway • ทดสอบ LED เท่านั้น ไม่สั่งไม้กั้น',button('device','＋ ลงทะเบียนอุปกรณ์',true,writeDisabled()));
+            content+=table(['ชื่อ','ชนิด','สถานะ','ล่าสุด','จัดการ'],s.devices.map(d=>[escape(d.name),escape(d.type),escape(d.status),time(d.lastSeen),owner()?button('provision','สร้าง/หมุนคีย์',false,writeDisabled(),`data-id="${escape(d.id)}"`)+button('disableDevice','ปิดการเชื่อมต่อ',false,writeDisabled(),`data-id="${escape(d.id)}"`)+(d.type==='ESP32'?button('queueLed','ทดสอบ LED',false,writeDisabled(),`data-id="${escape(d.id)}"`):''):'']));
+            content+=`<div class="card section-gap"><h3>ก่อนเชื่อมอุปกรณ์จริง</h3><p>Gateway รับ heartbeat และทะเบียนจากอุปกรณ์ที่มีคีย์ รองรับคำสั่ง LED bench เท่านั้น ต้องเปิด HTTPS และกำหนดค่า Gateway ก่อนใช้งาน ยังไม่อ่านภาพ ANPR หรือสั่งไม้กั้นจริง</p></div>`;
         } else if(tab==='settings') {
-            content=heading('ตั้งค่าลาน',escape(s.name));
-            content+=`<form id="settingsForm" class="card"><div class="form-grid"><label>ชื่อลาน<input name="name" value="${escape(s.name)}" maxlength="160" required></label><label>ที่อยู่<input name="address" value="${escape(s.address)}" maxlength="160" required></label><label>ราคา / ชั่วโมง (บาท)<input name="rate" type="number" min="0" max="10000" step="1" value="${s.rate}" required></label><label>ฟรีนาทีแรก<input name="freeMinutes" type="number" min="0" max="1440" value="${s.freeMinutes}" required></label></div><label class="check-label"><input name="active" type="checkbox" ${s.active?'checked':''}>เปิดรับรถใหม่</label><label class="check-label"><input name="membership" type="checkbox" ${s.features.membership?'checked':''}>เปิดสมาชิก</label><label class="check-label"><input name="reservation" type="checkbox" ${s.features.reservation?'checked':''}>เปิดการจอง</label><p class="help">คิดเฉพาะเวลาที่เกินช่วงฟรี ปัดขึ้นเป็นชั่วโมง เก็บอัตราขณะรถเข้ากับตั๋วเดิม การเปลี่ยนราคาจึงไม่เปลี่ยนตั๋วที่กำลังจอด</p><button class="primary" ${writeDisabled()?'disabled':''}>บันทึกการตั้งค่า</button></form><div class="card section-gap"><h3>ส่วนขยาย ${escape(C.templates[s.businessType][0])}</h3><p>ยังไม่เปิดใช้งาน: ${escape(C.templates[s.businessType][2])} รวมถึงราคาแยกประเภทรถ วันหยุด คูปอง และการชำระเงินออนไลน์</p></div>`;
+            content=heading('ตั้งค่าลาน',escape(s.name),button('pricing','ราคา / สมาชิก / ผู้มาติดต่อ',true,writeDisabled()));
+            content+=`<form id="settingsForm" class="card"><div class="form-grid"><label>ชื่อลาน<input name="name" value="${escape(s.name)}" maxlength="160" required></label><label>ที่อยู่<input name="address" value="${escape(s.address)}" maxlength="160" required></label><label>ราคา / ชั่วโมง (บาท)<input name="rate" type="number" min="0" max="10000" step="1" value="${s.rate}" required></label><label>ฟรีนาทีแรก<input name="freeMinutes" type="number" min="0" max="1440" value="${s.freeMinutes}" required></label></div><label class="check-label"><input name="active" type="checkbox" ${s.active?'checked':''}>เปิดรับรถใหม่</label><label class="check-label"><input name="membership" type="checkbox" ${s.features.membership?'checked':''}>เปิดสมาชิก</label><label class="check-label"><input name="reservation" type="checkbox" ${s.features.reservation?'checked':''}>เปิดการจอง</label><p class="help">คิดเฉพาะเวลาที่เกินช่วงฟรี ปัดขึ้นเป็นชั่วโมง เก็บอัตราขณะรถเข้ากับตั๋วเดิม การเปลี่ยนราคาจึงไม่เปลี่ยนตั๋วที่กำลังจอด</p><button class="primary" ${writeDisabled()?'disabled':''}>บันทึกการตั้งค่า</button></form><div class="card section-gap"><h3>ส่วนขยาย ${escape(C.templates[s.businessType][0])}</h3><p>ตั้งกฎราคาและสมาชิกได้จากปุ่มด้านบน มีคูปองแบบเจ้าหน้าที่ตรวจและ Valet ตามประเภทลาน ส่วน PMS, POS และการชำระเงินออนไลน์ยังไม่เชื่อมผู้ให้บริการ</p></div>`;
         } else if(tab==='users') {
             content=heading('บริษัทและทีมงาน','สิทธิ์ถูกตรวจจาก Session ฝั่งเซิร์ฟเวอร์',button('user','＋ พนักงาน / ผู้ดูแล',false,writeDisabled()||!state.sites.length)+(state.user.role==='super_admin'?button('tenant','＋ บริษัท / เจ้าของ',true,writeDisabled()):''));
             content+=table(['บริษัท','แพ็กเกจ'],state.tenants.map(t=>[escape(t.name),escape(t.plan)+' · ยังไม่มีเรียกเก็บเงิน']));
@@ -85,6 +86,15 @@
         } else if(tab==='audit') {
             content=heading('บันทึกกิจกรรม','ล่าสุด 5,000 เหตุการณ์ · ไม่บันทึกรหัสผ่าน');
             content+=table(['เวลา','บัญชี','คำสั่ง','ลาน'],state.audit.slice().reverse().map(a=>[time(a.at),escape(a.actor),escape(a.action),escape(state.sites.find(s=>s.id===a.siteId)?.name||'—')]));
+        }
+        if(tab==='operations') {
+            content+=button('visitor','ขออนุมัติผู้มาติดต่อ',false,writeDisabled());
+            if(s.businessType==='MALL'&&manager()) content+='<h3>คูปองที่ตรวจโดยเจ้าหน้าที่</h3>'+table(['ทะเบียน','ส่วนลด',''],s.tickets.filter(t=>t.status==='ACTIVE').map(t=>[escape(t.licensePlate),`${t.couponDiscountPercent||0}%`,button('coupon','บันทึกคูปอง',false,writeDisabled()||!!t.couponCode,`data-id="${escape(t.ticketId)}"`)]));
+            if(s.businessType==='HOTEL') content+='<h3>Valet / ผู้รับผิดชอบรถ</h3>'+table(['ทะเบียน','สถานะ','ผู้รับผิดชอบ',''],s.tickets.filter(t=>t.status==='ACTIVE').map(t=>{const stage=({'':'RECEIVED',RECEIVED:'PARKED',PARKED:'RETURNED'})[t.valetStage||''];return [escape(t.licensePlate),escape(t.valetStage||'ยังไม่รับฝาก'),escape(t.valetStaff||'—'),stage?button('valet',({RECEIVED:'รับฝากรถ',PARKED:'จอดแล้ว',RETURNED:'ส่งคืนแล้ว'})[stage],false,writeDisabled(),`data-id="${escape(t.ticketId)}" data-stage="${stage}"`):'ส่งคืนแล้ว'];}));
+        }
+        if(tab==='editor') {
+            const curves=(s.roadCurves||[]).filter(c=>c.floor===floor);
+            content+=`<section class="card section-gap"><h3>แบบร่างถนนโค้ง • ชั้น ${floor}</h3><p>พื้นที่ 100 × 100 เมตร เป็นแบบร่างแยกจาก Grid ที่ใช้รับรถ ยังไม่ตรวจรัศมีเลี้ยวหรือเชื่อมเส้นทางอัตโนมัติ</p>${button('roadCurve','เพิ่มถนนโค้ง',false,writeDisabled())}<svg viewBox="-6 -6 112 112" role="img" aria-label="แบบร่างถนนโค้ง" style="width:100%;max-width:540px;background:#263b35">${curves.map(c=>`<path d="M ${c.x1} ${c.y1} Q ${c.cx} ${c.cy} ${c.x2} ${c.y2}" fill="none" stroke="#8ca69e" stroke-width="${c.width}"/><path d="M ${c.x1} ${c.y1} Q ${c.cx} ${c.cy} ${c.x2} ${c.y2}" fill="none" stroke="white" stroke-width="0.3" stroke-dasharray="2 2"/>`).join('')}</svg>${table(['ชื่อ','กว้าง (ม.)',''],curves.map(c=>[escape(c.label),c.width,button('removeCurve','ลบ',false,writeDisabled(),`data-id="${escape(c.id)}"`)]))}</section>`;
         }
         $('main').innerHTML=content;
         if(tab==='settings') $('settingsForm').onsubmit=async e=>{e.preventDefault(); const f=new FormData(e.target); await safely(async()=>{await command('configure',{name:f.get('name'),address:f.get('address'),rate:Number(f.get('rate')),freeMinutes:Number(f.get('freeMinutes')),active:f.has('active'),features:{membership:f.has('membership'),reservation:f.has('reservation')}}); showWorkspace(); notice('บันทึกการตั้งค่าแล้ว');});};
@@ -108,7 +118,12 @@
         if(existing) return notice('ตำแหน่งนี้มีชิ้นส่วนแล้ว กรุณาย้ายหรือลบก่อน',true);
         mutate(()=>{const id=crypto.randomUUID();draft.push({id,type,x,y,floor,label:type==='SLOT'?`F${floor}-${x+1}-${y+1}`:C.types[type],slotType:'STANDARD',rotation:0,oneWay:false});selected=id;});
     }
-    function fee(t) { const seconds=Math.max(0,Math.floor((Date.now()-new Date(t.entryTime).getTime())/1000));return seconds<=t.freeMinutes*60?0:Math.ceil((seconds-t.freeMinutes*60)/3600)*t.rate; }
+    function fee(t) {
+        const seconds=Math.max(0,Math.floor((Date.now()-new Date(t.entryTime).getTime())/1000));
+        const hours=Math.ceil(Math.max(0,seconds-t.freeMinutes*60)/3600),cap=Number(t.dailyCap||0),rate=Number(t.rate);
+        const gross=cap>0?Math.floor(hours/24)*Math.min(24*rate,cap)+Math.min((hours%24)*rate,cap):hours*rate;
+        return Math.ceil(gross*(100-Math.max(t.memberDiscountPercent||0,t.couponDiscountPercent||0))/100);
+    }
     function historyRows() { return current().tickets.filter(t=>{const date=new Date(t.entryTime), local=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;return (!filters.from||local>=filters.from)&&(!filters.to||local<=filters.to)&&t.licensePlate.toLowerCase().includes(filters.plate.toLowerCase());}).slice().sort((a,b)=>b.entryTime.localeCompare(a.entryTime)); }
     function field(name,label,type='text',value='',extra='') { return `<label>${label}<input name="${name}" type="${type}" value="${escape(value)}" required maxlength="160" ${extra}></label>`; }
     function select(name,label,values,selected='') { return `<label>${label}<select name="${name}">${options(values,selected)}</select></label>`; }
@@ -121,6 +136,27 @@
     }
     async function action(name,element) {
         const s=current();
+        if(name==='roadCurve') modal('ถนนโค้งแบบร่าง (เมตร)',field('label','ชื่อถนน')+['x1','y1','cx','cy','x2','y2'].map((k,i)=>field(k,({x1:'เริ่ม X',y1:'เริ่ม Y',cx:'จุดควบคุม X',cy:'จุดควบคุม Y',x2:'จบ X',y2:'จบ Y'})[k],'number',[10,10,80,10,80,80][i],'min="0" max="100"')).join('')+field('width','ความกว้างถนน (เมตร)','number',6,'min="2" max="12"'),f=>command('addRoadCurve',{label:f.get('label'),floor,...Object.fromEntries(['x1','y1','cx','cy','x2','y2','width'].map(k=>[k,Number(f.get(k))]))}));
+        if(name==='removeCurve') {if(!confirm('ลบถนนแบบร่างนี้?'))return;await command('removeRoadCurve',{curveId:element.dataset.id});showWorkspace();}
+        if(name==='provision') {
+            if(!confirm('สร้างคีย์ใหม่จะยกเลิกคีย์เดิม ต้องตั้งค่าอุปกรณ์ใหม่ ต้องการดำเนินการ?')) return;
+            await command('provisionDevice',{deviceId:element.dataset.id});
+            const token=state.deviceSecret;delete state.deviceSecret;showWorkspace();
+            modal('คีย์อุปกรณ์ — แสดงครั้งเดียว',`<p>เก็บคีย์นี้ในอุปกรณ์ ผ่าน HTTPS เท่านั้น ห้ามแชร์</p><label>คีย์<input readonly value="${escape(token)}"></label><p>Site ID: ${escape(siteId)}<br>Device ID: ${escape(element.dataset.id)}</p>`,async()=>{});
+        }
+        if(name==='queueLed'||name==='disableDevice') {await command(name,{deviceId:element.dataset.id});showWorkspace();}
+        if(name==='pricing') {
+            const p=s.policy||{},fields={carRate:'รถยนต์',evRate:'EV',motorcycleRate:'มอเตอร์ไซค์',truckRate:'รถใหญ่',weekendRate:'เสาร์–อาทิตย์',holidayRate:'วันหยุด'};
+            modal('กฎราคาและสิทธิ์', '<p>ราคาเป็นบาท/ชั่วโมง ใส่ -1 เพื่อใช้ราคาเดิม วันหยุดมีลำดับสูงสุด ตามวันที่รถเข้า (เวลาไทย)</p>'+Object.entries(fields).map(([key,label])=>field(key,label,'number',p[key]??-1,'min="-1" max="10000"')).join('')+field('dailyCap','เพดานต่อ 24 ชั่วโมงที่คิดเงิน (0 = ไม่จำกัด)','number',p.dailyCap||0,'min="0" max="100000"')+field('memberDiscountPercent','ส่วนลดสมาชิก (%)','number',p.memberDiscountPercent||0,'min="0" max="100"')+field('roomQuota','โควตารถต่อห้อง (0 = ไม่จำกัด)','number',p.roomQuota||0,'min="0" max="100"')+`<label>วันหยุด YYYY-MM-DD คั่นด้วยจุลภาค<input name="holidays" value="${escape((p.holidays||[]).join(','))}"></label><label class="check-label"><input name="requireVisitorApproval" type="checkbox" ${p.requireVisitorApproval?'checked':''}>รถที่ไม่ใช่สมาชิกต้องอนุมัติก่อนเข้า</label>`, f=>{
+                const policy=Object.fromEntries([...Object.keys(fields),'dailyCap','memberDiscountPercent','roomQuota'].map(k=>[k,Number(f.get(k))]));
+                policy.holidays=String(f.get('holidays')).split(',').map(v=>v.trim()).filter(Boolean); policy.requireVisitorApproval=f.has('requireVisitorApproval');
+                return command('configurePolicy',{policy});
+            });
+        }
+        if(name==='visitor') modal('ขออนุมัติผู้มาติดต่อ',field('plate','ทะเบียน')+field('room','ห้อง / ผู้ติดต่อ')+field('expires','หมดอายุ (ไม่เกิน 7 วัน)','datetime-local'),f=>command('requestVisitor',{plate:f.get('plate'),room:f.get('room'),expires:new Date(f.get('expires')).toISOString()}));
+        if(name==='approveVisitor') { await command('approveVisitor',{visitorId:element.dataset.id,approved:true}); showWorkspace(); }
+        if(name==='coupon') modal('คูปองที่เจ้าหน้าที่ตรวจแล้ว',field('code','เลขคูปอง / หลักฐาน (ห้ามซ้ำ)')+field('percent','ส่วนลด (%)','number',10,'min="1" max="100"'),f=>command('applyCoupon',{ticketId:element.dataset.id,code:f.get('code'),percent:Number(f.get('percent'))}));
+        if(name==='valet') { await command('valet',{ticketId:element.dataset.id,stage:element.dataset.stage});showWorkspace(); }
         if(name==='toggleUser'||name==='revokeUser') {
             const u=state.users.find(u=>u.id===element.dataset.id);
             if(!u||!confirm(`ยืนยัน ${name==='revokeUser'?'ออกจากระบบทุกเครื่อง':u.active===false?'เปิดบัญชี':'ปิดบัญชี'}: ${u.username}?`)) return;
@@ -147,7 +183,7 @@
             vehicle.onchange=update;update();
         }
         if(name==='checkout') {const t=s.tickets.find(t=>t.ticketId===element.dataset.id);modal('ยืนยันรับเงินสดและนำรถออก',`<p>ทะเบียน ${escape(t.licensePlate)} · ช่อง ${escape(t.slotNumber)}</p><h2>${money(fee(t))}</h2><p>ยอดประมาณการ ณ ตอนนี้ เซิร์ฟเวอร์คำนวณอีกครั้งเมื่อยืนยัน ยังไม่มี Payment Gateway หรือคำสั่งเปิดไม้กั้น</p><label class="check-label"><input type="checkbox" required>รับเงินสดเรียบร้อยแล้ว / ไม่มีค่าบริการ</label>`,()=>command('checkout',{ticketId:t.ticketId}));}
-        if(name==='member')modal('เพิ่มสมาชิก',field('name','ชื่อสมาชิก')+field('plate','ทะเบียน')+field('room','เลขห้อง / หน่วยงาน')+field('expires','วันหมดอายุ','date'),f=>command('addMember',Object.fromEntries(f)));
+        if(name==='member')modal('เพิ่มสมาชิก / ผู้เข้าพัก',field('name','ชื่อสมาชิก')+field('plate','ทะเบียน')+field('room','เลขห้อง / หน่วยงาน')+field('starts','วันเริ่มสิทธิ์ / เข้าพัก','date')+field('expires','วันหมดอายุ / ออก','date'),f=>command('addMember',Object.fromEntries(f)));
         if(name==='reserve')modal('จองช่องล่วงหน้า',field('plate','ทะเบียน')+select('slotId','ช่องจอด',siteOptions())+field('from','เริ่ม','datetime-local')+field('to','สิ้นสุด','datetime-local'),f=>command('reserve',{plate:f.get('plate'),slotId:f.get('slotId'),from:new Date(f.get('from')).toISOString(),to:new Date(f.get('to')).toISOString()}));
         if(name==='cancelReservation') {if(!confirm('ยกเลิกการจองนี้?'))return;await command('cancelReservation',{reservationId:element.dataset.id});showWorkspace();}
         if(name==='device')modal('ทะเบียนอุปกรณ์ (ยังไม่เชื่อมต่อ)',field('name','ชื่อ / ตำแหน่ง')+select('type','ชนิด',{CAMERA:'กล้อง',ESP32:'ESP32',SENSOR:'เซนเซอร์',BARRIER:'ไม้กั้น'}),f=>command('addDevice',Object.fromEntries(f)));

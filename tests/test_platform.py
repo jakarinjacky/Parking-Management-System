@@ -18,8 +18,10 @@ class Client:
         self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
         self.state = None
 
-    def request(self, path, body=None, expected=200, origin=None):
+    def request(self, path, body=None, expected=200, origin=None, authorization=None):
         headers = {'Content-Type': 'application/json'}
+        if authorization:
+            headers['Authorization'] = authorization
         if origin:
             headers['Origin'] = origin
         req = urllib.request.Request('http://localhost:8080/api/platform/' + path,
@@ -42,7 +44,7 @@ class Client:
         return self.request('command', {'action': action, 'revision': self.state['revision'], **kwargs}, expected)
 
 with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
-    env = dict(os.environ, PLATFORM_DEMO='true', PLATFORM_DATA_DIR=str(Path(temporary) / 'platform'))
+    env = dict(os.environ, PLATFORM_DEMO='true', PLATFORM_DEVICE_GATEWAY='true', PLATFORM_DATA_DIR=str(Path(temporary) / 'platform'))
     def start():
         process = subprocess.Popen(['java', '-cp', CLASSES, 'server.ParkingServer'], cwd=temporary, env=env,
                                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -115,6 +117,51 @@ with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
         assert len(owner.state['sites'])==4
         # Account changes preserve business data and invalidate existing sessions.
         staff=Client(); staff.login('staff')
+        policy={k:-1 for k in ['carRate','evRate','motorcycleRate','truckRate','weekendRate','holidayRate']}
+        policy.update(dailyCap=100,memberDiscountPercent=50,roomQuota=1,requireVisitorApproval=True,holidays=[])
+        staff.command('configurePolicy',expected=403,siteId=sid,policy=policy)
+        owner.command('configurePolicy',siteId=sid,policy=policy)
+        from datetime import datetime, timedelta, timezone
+        expires=(datetime.now(timezone.utc)+timedelta(hours=1)).isoformat().replace('+00:00','Z')
+        staff.command('requestVisitor',siteId=sid,plate='VISITOR',room='201',expires=expires)
+        staff.command('checkin',expected=400,siteId=sid,plate='VISITOR',slotId='A4',vehicleType='CAR')
+        owner.request('state')
+        visitor=next(s for s in owner.state['sites'] if s['id']==sid)['visitors'][-1]
+        staff.command('approveVisitor',expected=403,siteId=sid,visitorId=visitor['id'],approved=True)
+        owner.command('approveVisitor',siteId=sid,visitorId=visitor['id'],approved=True)
+        staff.command('checkin',siteId=sid,plate='VISITOR',slotId='A4',vehicleType='CAR')
+        owner.request('state')
+        mall=next(s for s in owner.state['sites'] if s['businessType']=='MALL')
+        hotel=next(s for s in owner.state['sites'] if s['businessType']=='HOTEL')
+        owner.command('checkin',siteId=mall['id'],plate='COUPON',slotId='A4',vehicleType='CAR')
+        ticket=next(s for s in owner.state['sites'] if s['id']==mall['id'])['tickets'][-1]
+        owner.command('applyCoupon',siteId=mall['id'],ticketId=ticket['ticketId'],code='RECEIPT-1',percent=25)
+        owner.command('applyCoupon',expected=400,siteId=mall['id'],ticketId=ticket['ticketId'],code='RECEIPT-1',percent=25)
+        owner.command('checkin',siteId=hotel['id'],plate='VALET',slotId='A4',vehicleType='CAR')
+        ticket=next(s for s in owner.state['sites'] if s['id']==hotel['id'])['tickets'][-1]
+        owner.command('valet',siteId=hotel['id'],ticketId=ticket['ticketId'],stage='RECEIVED')
+        owner.command('checkout',expected=400,siteId=hotel['id'],ticketId=ticket['ticketId'])
+        for stage in ['PARKED','RETURNED']:owner.command('valet',siteId=hotel['id'],ticketId=ticket['ticketId'],stage=stage)
+        owner.command('checkout',siteId=hotel['id'],ticketId=ticket['ticketId'])
+        owner.command('addRoadCurve',siteId=sid,label='Curve',floor=1,width=6,x1=10,y1=10,cx=80,cy=10,x2=80,y2=80)
+        owner.command('addRoadCurve',expected=400,siteId=sid,label='Invalid',floor=1,width=6,x1=-1,y1=10,cx=80,cy=10,x2=80,y2=80)
+        owner.command('addDevice',siteId=sid,name='Bench',type='ESP32')
+        device=next(s for s in owner.state['sites'] if s['id']==sid)['devices'][-1]
+        staff.command('provisionDevice',expected=403,siteId=sid,deviceId=device['id'])
+        owner.command('provisionDevice',siteId=sid,deviceId=device['id'])
+        device_token=owner.state['deviceSecret']
+        event={'siteId':sid,'deviceId':device['id'],'type':'HEARTBEAT'}
+        Client().request('device',event,expected=403)
+        Client().request('device',event,authorization='Bearer '+device_token)
+        owner.request('state')
+        assert 'deviceSecret' not in owner.state and 'tokenHash' not in json.dumps(owner.state)
+        owner.command('queueLed',siteId=sid,deviceId=device['id'])
+        response=Client().request('device',event,authorization='Bearer '+device_token)
+        ack={**event,'type':'ACK','commandId':response['command']['id']}
+        Client().request('device',ack,authorization='Bearer '+device_token)
+        Client().request('device',ack,authorization='Bearer '+device_token)
+        owner.command('disableDevice',siteId=sid,deviceId=device['id'])
+        Client().request('device',event,expected=403,authorization='Bearer '+device_token)
         owner.request('state')
         staff_id=next(u['id'] for u in owner.state['users'] if u['username']=='staff')
         other=Client(); other.login('owner2')

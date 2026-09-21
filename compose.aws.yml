@@ -26,6 +26,7 @@ services:
       PLATFORM_ONLY: "true"
       PLATFORM_DEMO: "false"
       PLATFORM_SECURE_COOKIE: ${PLATFORM_SECURE_COOKIE:-false}
+      PLATFORM_DEVICE_GATEWAY: ${PLATFORM_DEVICE_GATEWAY:-false}
       PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD:?set PLATFORM_ADMIN_PASSWORD in .env}
       DATABASE_URL: jdbc:postgresql://database:5432/parking_platform
       DB_USER: parking_app

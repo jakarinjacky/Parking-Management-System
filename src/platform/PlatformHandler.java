@@ -11,6 +11,7 @@ import util.SimpleJson;
 
 /** Separate platform session prevents legacy single-lot demo accounts from gaining tenant permissions. */
 public final class PlatformHandler implements HttpHandler {
+    private static final class SessionExpired extends SecurityException {}
     private record Session(String userId,Instant expires,int version) {}
     private record Attempts(int count,long minute) {}
     private final Map<String,Session> sessions=new ConcurrentHashMap<>();
@@ -24,6 +25,8 @@ public final class PlatformHandler implements HttpHandler {
                 ? new FilePlatformStore(Path.of(directory,"platform.json"))
                 : new PostgresPlatformStore(databaseUrl,System.getenv("DB_USER"),System.getenv("DB_PASSWORD"));
             service=new PlatformService(store,"true".equalsIgnoreCase(System.getenv("PLATFORM_DEMO")),System.getenv("PLATFORM_ADMIN_PASSWORD"));
+            var scheduler=java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r->{Thread t=new Thread(r,"platform-retention");t.setDaemon(true);return t;});
+            scheduler.scheduleWithFixedDelay(()->{try { service.maintenance(); } catch(Exception e) { System.err.println("Platform retention failed"); }},1,60,java.util.concurrent.TimeUnit.MINUTES);
         } catch(Exception e) { throw new IOException("Cannot initialize platform store",e); }
     }
     @Override public void handle(HttpExchange exchange) throws IOException {
@@ -32,7 +35,7 @@ public final class PlatformHandler implements HttpHandler {
             boolean write=method.equals("POST");
             if(!write&&!method.equals("GET")) { reply(exchange,405,Map.of("error","Method not allowed")); return; }
             if(path.equals("/api/platform/health")&&method.equals("GET")) {
-                reply(exchange,200,Map.of("status","ok")); return;
+                service.atomic(()->null); reply(exchange,200,Map.of("status","ok")); return;
             }
             if(write) {
                 String origin=exchange.getRequestHeaders().getFirst("Origin"),host=exchange.getRequestHeaders().getFirst("Host");
@@ -46,27 +49,43 @@ public final class PlatformHandler implements HttpHandler {
                 Attempts a=attempts.compute(ip,(k,old)->new Attempts(old==null||old.minute()!=minute?1:old.count()+1,minute));
                 if(a.count()>12) { reply(exchange,429,Map.of("error","ลองเข้าสู่ระบบมากเกินไป รอ 1 นาที")); return; }
                 synchronized(service) {
-                var request=body(exchange); String user=service.login(PlatformService.string(request,"username"),PlatformService.password(request,"password"));
+                var request=body(exchange);
+                var loginResult=service.atomic(()->{
+                    String id=service.login(PlatformService.string(request,"username"),PlatformService.password(request,"password"));
+                    return Map.of("id",id,"version",service.sessionVersion(id),"view",service.view(id));
+                });
+                String user=loginResult.get("id").toString();
                 sessions.entrySet().removeIf(e->e.getValue().expires().isBefore(Instant.now()));
                 if(sessions.size()>=1000) throw new IllegalStateException("Too many sessions");
-                String token=UUID.randomUUID().toString()+UUID.randomUUID(); sessions.put(token,new Session(user,Instant.now().plusSeconds(28800),service.sessionVersion(user)));
+                String token=UUID.randomUUID().toString()+UUID.randomUUID(); sessions.put(token,new Session(user,Instant.now().plusSeconds(28800),(Integer)loginResult.get("version")));
                 exchange.getResponseHeaders().add("Set-Cookie","platform_session="+token+"; Path=/api/platform; HttpOnly; SameSite=Strict; Max-Age=28800"+secure());
-                reply(exchange,200,service.view(user)); return;
+                reply(exchange,200,loginResult.get("view")); return;
                 }
+            }
+            if(path.equals("/api/platform/device")&&write) {
+                if(!"true".equalsIgnoreCase(System.getenv("PLATFORM_DEVICE_GATEWAY"))) {reply(exchange,503,Map.of("error","Device gateway is disabled"));return;}
+                String authorization=exchange.getRequestHeaders().getFirst("Authorization");
+                if(authorization==null||!authorization.startsWith("Bearer ")) throw new SecurityException("Device authentication failed");
+                reply(exchange,200,service.deviceEvent(authorization.substring(7),body(exchange)));return;
             }
             String token=cookie(exchange); Session session=sessions.get(token);
             if(session==null||!session.expires().isAfter(Instant.now())) { sessions.remove(token); reply(exchange,401,Map.of("error","กรุณาเข้าสู่แพลตฟอร์ม")); return; }
             synchronized(service) {
-            boolean valid;
-            try { valid=session.version()==service.sessionVersion(session.userId()); } catch(SecurityException e) { valid=false; }
-            if(!valid) { sessions.remove(token); reply(exchange,401,Map.of("error","สิทธิ์หรือรหัสผ่านเปลี่ยน กรุณาเข้าสู่ระบบใหม่")); return; }
-            if(path.equals("/api/platform/state")&&method.equals("GET")) reply(exchange,200,service.view(session.userId()));
-            else if(path.equals("/api/platform/command")&&write) reply(exchange,200,service.command(session.userId(),body(exchange)));
+            var request=path.equals("/api/platform/command")&&write?body(exchange):Map.<String,Object>of();
+            Object result=service.atomic(()->{
+                try { if(session.version()!=service.sessionVersion(session.userId())) throw new SessionExpired(); }
+                catch(SecurityException e) { sessions.remove(token); throw new SessionExpired(); }
+                if(path.equals("/api/platform/state")&&method.equals("GET")) return service.view(session.userId());
+                if(path.equals("/api/platform/command")&&write) return service.command(session.userId(),request);
+                return null;
+            });
+            if(result!=null) reply(exchange,200,result);
             else if(path.equals("/api/platform/logout")&&write) {
                 sessions.remove(token); exchange.getResponseHeaders().add("Set-Cookie","platform_session=; Path=/api/platform; HttpOnly; SameSite=Strict; Max-Age=0"+secure()); reply(exchange,200,Map.of("ok",true));
             } else reply(exchange,404,Map.of("error","Not found"));
             }
-        } catch(SecurityException e) { reply(exchange,403,Map.of("error",e.getMessage())); }
+        } catch(SessionExpired e) { reply(exchange,401,Map.of("error","สิทธิ์หรือรหัสผ่านเปลี่ยน กรุณาเข้าสู่ระบบใหม่")); }
+          catch(SecurityException e) { reply(exchange,403,Map.of("error",e.getMessage())); }
           catch(ConcurrentModificationException e) { reply(exchange,409,Map.of("error",e.getMessage())); }
           catch(IllegalArgumentException|NoSuchElementException e) { reply(exchange,400,Map.of("error",e.getMessage()==null?"ข้อมูลไม่ถูกต้อง":e.getMessage())); }
           catch(Exception e) { System.err.println("Platform request failed: "+e.getClass().getSimpleName()); reply(exchange,500,Map.of("error","บันทึกไม่สำเร็จ ข้อมูลเดิมยังอยู่ กรุณาลองใหม่")); }
