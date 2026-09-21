@@ -1,0 +1,82 @@
+name: Deploy Platform to AWS EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: aws-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || vars.AWS_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile and test before deployment
+        run: |
+          mkdir -p bin
+          find src -name '*.java' -print > sources.txt
+          javac -encoding UTF-8 -d bin @sources.txt
+          java -cp bin test.ParkingSystemTest
+          node tests/platform-core.test.cjs
+          python tests/test_platform.py bin
+
+      - name: Configure SSH
+        env:
+          AWS_SSH_PRIVATE_KEY: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
+          AWS_KNOWN_HOSTS: ${{ secrets.AWS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$AWS_SSH_PRIVATE_KEY" > ~/.ssh/aws_deploy_key
+          chmod 600 ~/.ssh/aws_deploy_key
+          printf '%s\n' "$AWS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Build deployment package and environment
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          PLATFORM_ADMIN_PASSWORD: ${{ secrets.PLATFORM_ADMIN_PASSWORD }}
+        run: |
+          tar --exclude=.git --exclude=.env --exclude=bin --exclude=data -czf /tmp/parking-platform.tar.gz .
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          values = {
+              "DB_PASSWORD": os.environ["DB_PASSWORD"],
+              "PLATFORM_ADMIN_PASSWORD": os.environ["PLATFORM_ADMIN_PASSWORD"],
+              "APP_BIND_IP": "0.0.0.0",
+              "APP_PORT": "8080",
+              "PLATFORM_SECURE_COOKIE": "false",
+          }
+          if any("\n" in value or "\r" in value for value in values.values()):
+              raise SystemExit("Deployment secrets must be single-line values")
+          Path("/tmp/parking-platform.env").write_text(
+              "".join(f"{key}={value}\n" for key, value in values.items()), encoding="utf-8")
+          PY
+
+      - name: Upload and restart containers
+        env:
+          AWS_HOST: ${{ secrets.AWS_HOST }}
+          AWS_USER: ${{ secrets.AWS_USER }}
+        run: |
+          scp -i ~/.ssh/aws_deploy_key /tmp/parking-platform.tar.gz /tmp/parking-platform.env "$AWS_USER@$AWS_HOST:/tmp/"
+          ssh -i ~/.ssh/aws_deploy_key "$AWS_USER@$AWS_HOST" 'set -eu
+            cd /opt/parking-platform
+            find . -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf {} +
+            tar -xzf /tmp/parking-platform.tar.gz
+            install -m 600 /tmp/parking-platform.env .env
+            docker compose -f compose.aws.yml up -d --build --remove-orphans
+            docker compose -f compose.aws.yml ps
+            rm -f /tmp/parking-platform.tar.gz /tmp/parking-platform.env'
+
+      - name: Verify health
+        env:
+          AWS_HOST: ${{ secrets.AWS_HOST }}
+        run: curl --fail --retry 12 --retry-delay 5 "http://$AWS_HOST:8080/api/platform/health"
