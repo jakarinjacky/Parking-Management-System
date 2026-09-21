@@ -68,6 +68,16 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await page.locator('#workspace').waitFor({state:'visible'});
   assert.equal(await page.locator('[data-nav=editor]').count(),0);
   assert.equal(await page.locator('[data-nav=history]').count(),0);
+  await page.getByRole('button',{name:'เปลี่ยนรหัสผ่าน',exact:true}).click();
+  await page.locator('#modal [name=currentPassword]').fill('DemoPass123!');
+  await page.locator('#modal [name=newPassword]').fill('BrowserPassword123!');
+  await page.locator('#modal [name=confirmPassword]').fill('BrowserPassword123!');
+  await page.locator('#modal button[type=submit]').click();
+  await page.locator('#loginScreen').waitFor({state:'visible'});
+  await page.locator('#loginForm [name=username]').fill('staff');
+  await page.locator('#loginForm [name=password]').fill('BrowserPassword123!');
+  await page.locator('#loginForm button').click();
+  await page.locator('#workspace').waitFor({state:'visible'});
   assert.deepEqual(errors,[]);
   console.log('Browser PASS: login, publish, parking, cash checkout, XLSX, custom road layout, all tabs, mobile, staff permissions');
   console.log('QA artifacts: '+tmp);
