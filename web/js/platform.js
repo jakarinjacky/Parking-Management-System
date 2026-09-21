@@ -81,7 +81,7 @@
         } else if(tab==='users') {
             content=heading('บริษัทและทีมงาน','สิทธิ์ถูกตรวจจาก Session ฝั่งเซิร์ฟเวอร์',button('user','＋ พนักงาน / ผู้ดูแล',false,writeDisabled()||!state.sites.length)+(state.user.role==='super_admin'?button('tenant','＋ บริษัท / เจ้าของ',true,writeDisabled()):''));
             content+=table(['บริษัท','แพ็กเกจ'],state.tenants.map(t=>[escape(t.name),escape(t.plan)+' · ยังไม่มีเรียกเก็บเงิน']));
-            content+=`<h3 class="section-gap">บัญชีผู้ใช้งาน</h3>`+table(['ชื่อบัญชี','สิทธิ์','บริษัท','ลานที่เข้าถึง'],state.users.map(u=>[escape(u.username),roles[u.role],escape(state.tenants.find(t=>t.id===u.tenantId)?.name||'แพลตฟอร์ม'),['owner','super_admin'].includes(u.role)?'ตามขอบเขตบริษัท':u.siteIds.map(id=>escape(state.sites.find(s=>s.id===id)?.name||id)).join(', ')]));
+            content+=`<h3 class="section-gap">บัญชีผู้ใช้งาน</h3>`+table(['ชื่อบัญชี','สิทธิ์','บริษัท','สถานะ','จัดการ'],state.users.map(u=>[escape(u.username),roles[u.role],escape(state.tenants.find(t=>t.id===u.tenantId)?.name||'แพลตฟอร์ม'),u.active===false?'ปิดใช้งาน':'ใช้งาน',u.id!==state.user.id&&u.role!=='super_admin'&&(state.user.role==='super_admin'||['admin','staff'].includes(u.role))?button('toggleUser',u.active===false?'เปิดบัญชี':'ปิดบัญชี',false,writeDisabled(),`data-id="${escape(u.id)}"`)+button('revokeUser','ออกจากระบบทุกเครื่อง',false,writeDisabled(),`data-id="${escape(u.id)}"`):'—']));
         } else if(tab==='audit') {
             content=heading('บันทึกกิจกรรม','ล่าสุด 5,000 เหตุการณ์ · ไม่บันทึกรหัสผ่าน');
             content+=table(['เวลา','บัญชี','คำสั่ง','ลาน'],state.audit.slice().reverse().map(a=>[time(a.at),escape(a.actor),escape(a.action),escape(state.sites.find(s=>s.id===a.siteId)?.name||'—')]));
@@ -121,6 +121,11 @@
     }
     async function action(name,element) {
         const s=current();
+        if(name==='toggleUser'||name==='revokeUser') {
+            const u=state.users.find(u=>u.id===element.dataset.id);
+            if(!u||!confirm(`ยืนยัน ${name==='revokeUser'?'ออกจากระบบทุกเครื่อง':u.active===false?'เปิดบัญชี':'ปิดบัญชี'}: ${u.username}?`)) return;
+            await command(name==='toggleUser'?'setUserActive':'revokeSessions',{userId:u.id,active:u.active===false}); showWorkspace();
+        }
         if(name==='openSite'||name==='editSite') { if(!checkDirty())return; siteId=element.dataset.id; tab=name==='editSite'?'editor':'operations';loadDraft();showWorkspace(); }
         if(name==='createSite') modal('สร้างลานจอด',field('name','ชื่อลาน')+(state.user.role==='super_admin'?select('tenantId','บริษัท',Object.fromEntries(state.tenants.map(t=>[t.id,t.name]))):'')+select('businessType','แม่แบบ',Object.fromEntries(Object.entries(C.templates).map(([k,v])=>[k,`${v[0]} — ${v[1]}`])))+'<p class="help">แม่แบบเป็นจุดเริ่มต้น ไม่ล็อกการแก้ไข แม่แบบใช้ผังเริ่มต้นร่วมกัน ปรับให้ตรงพื้นที่จริงก่อนเผยแพร่</p>',async f=>{const before=new Set(state.sites.map(s=>s.id));await command('createSite',Object.fromEntries(f));siteId=state.sites.find(s=>!before.has(s.id))?.id||siteId;tab='editor';loadDraft();});
         if(name==='tenant') modal('สร้างบริษัทพร้อมเจ้าของ',field('name','ชื่อบริษัท')+field('username','บัญชีเจ้าของ','text','','pattern="[a-z0-9._-]{3,40}"')+field('password','รหัสผ่าน (12 ตัวขึ้นไป)','password','','minlength="12" maxlength="128"'),f=>command('createTenant',Object.fromEntries(f)));
@@ -158,6 +163,18 @@
     $('sitePicker').onchange=e=>{if(!checkDirty()){e.target.value=siteId;return;}siteId=e.target.value;loadDraft();showWorkspace();};
     $('refreshButton').onclick=()=>safely(async()=>{if(!checkDirty())return;if(!preview)state=await api('state');loadDraft();showWorkspace();notice('อัปเดตแล้ว');});
     $('logoutButton').onclick=()=>safely(async()=>{if(!checkDirty())return;if(!preview)await api('logout',{});state=null;preview=false;dirty=false;$('workspace').hidden=true;$('loginScreen').hidden=false;});
+    const passwordButton=document.createElement('button');
+    passwordButton.textContent='เปลี่ยนรหัสผ่าน';
+    $('logoutButton').before(passwordButton);
+    passwordButton.onclick=()=>{
+        if(preview) return notice('ตัวอย่างอ่านอย่างเดียว',true);
+        modal('เปลี่ยนรหัสผ่าน',field('currentPassword','รหัสผ่านเดิม','password')+field('newPassword','รหัสผ่านใหม่ 12–128 ตัวอักษร','password','','minlength="12"')+field('confirmPassword','ยืนยันรหัสผ่านใหม่','password'),async f=>{
+            if(f.get('newPassword')!==f.get('confirmPassword')) throw new Error('รหัสผ่านใหม่ไม่ตรงกัน');
+            await command('changePassword',{currentPassword:f.get('currentPassword'),newPassword:f.get('newPassword')});
+            await api('logout',{}).catch(()=>{});
+            location.reload();
+        });
+    };
     $('cancelModal').onclick=()=>$('modal').close();
     $('modalForm').onsubmit=e=>{e.preventDefault();if(busy)return;safely(async()=>{await modalSubmit(new FormData(e.target));$('modal').close();showWorkspace();notice('บันทึกแล้ว');});};
     $('loginForm').onsubmit=e=>{e.preventDefault();safely(async()=>{state=await api('login',Object.fromEntries(new FormData(e.target)));preview=false;siteId='';tab='sites';e.target.reset();loadDraft();showWorkspace();});};

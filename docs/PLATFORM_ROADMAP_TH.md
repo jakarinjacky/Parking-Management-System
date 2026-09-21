@@ -5,6 +5,19 @@
 
 ## P0 — ก่อนเปิดรับลูกค้าจริง
 
+### รอบ Product foundation — งานที่เพิ่ม
+
+- [x] เปลี่ยนรหัสผ่านโดยยืนยันรหัสเดิม และยกเลิก Session เดิม
+- [x] กู้ superadmin ทาง EC2 console แบบไม่ลบข้อมูล พร้อม backup ก่อนทำ
+- [x] ปิด/เปิดบัญชีทีมงานและ revoke session โดยตรวจ tenant และป้องกันปิดตัวเอง
+- [x] ห้ามสร้างฐานข้อมูล production ใหม่ด้วยรหัสเริ่มต้นว่าง/สั้น
+- [x] Deploy เก็บโฟลเดอร์ backups ไว้; backup ไม่เขียนทับสำเนาวันเดียวกัน และไม่เก็บไฟล์ที่ dump ล้มเหลวเป็นสำเนาสำเร็จ
+- [x] เพิ่ม regression tests สำหรับบัญชี การกู้รหัส การ rollback และ session invalidation
+
+รายการนี้ไม่ทำให้ P0 ทั้งหมดเสร็จ: SQL ปัจจุบันยังเป็น aggregate JSONB ใช้ app instance เดียว
+งานถัดไปคือ transaction/concurrency ใน PostgreSQL, restore drill, HTTPS และ browser acceptance
+เอกสารขั้นตอนกู้บัญชี: [ACCOUNT_RECOVERY_TH.md](ACCOUNT_RECOVERY_TH.md)
+
 - [ ] ย้าย atomic JSON เป็น SQL พร้อม Repository interfaces และ transaction
   - ผ่านเมื่อข้อมูลหลายบริษัทไม่รั่ว, concurrent check-in ไม่ซ้ำ, rollback และ restore ทดสอบได้
 - [ ] รวม ParkingService เดิมกับ tenant context และ migration แบบ dry-run

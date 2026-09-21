@@ -11,7 +11,7 @@ import util.SimpleJson;
 
 /** Separate platform session prevents legacy single-lot demo accounts from gaining tenant permissions. */
 public final class PlatformHandler implements HttpHandler {
-    private record Session(String userId,Instant expires) {}
+    private record Session(String userId,Instant expires,int version) {}
     private record Attempts(int count,long minute) {}
     private final Map<String,Session> sessions=new ConcurrentHashMap<>();
     private final Map<String,Attempts> attempts=new ConcurrentHashMap<>();
@@ -45,20 +45,27 @@ public final class PlatformHandler implements HttpHandler {
                 attempts.entrySet().removeIf(e->e.getValue().minute()!=minute);
                 Attempts a=attempts.compute(ip,(k,old)->new Attempts(old==null||old.minute()!=minute?1:old.count()+1,minute));
                 if(a.count()>12) { reply(exchange,429,Map.of("error","ลองเข้าสู่ระบบมากเกินไป รอ 1 นาที")); return; }
-                var request=body(exchange); String user=service.login(PlatformService.string(request,"username"),PlatformService.string(request,"password"));
+                synchronized(service) {
+                var request=body(exchange); String user=service.login(PlatformService.string(request,"username"),PlatformService.password(request,"password"));
                 sessions.entrySet().removeIf(e->e.getValue().expires().isBefore(Instant.now()));
                 if(sessions.size()>=1000) throw new IllegalStateException("Too many sessions");
-                String token=UUID.randomUUID().toString()+UUID.randomUUID(); sessions.put(token,new Session(user,Instant.now().plusSeconds(28800)));
+                String token=UUID.randomUUID().toString()+UUID.randomUUID(); sessions.put(token,new Session(user,Instant.now().plusSeconds(28800),service.sessionVersion(user)));
                 exchange.getResponseHeaders().add("Set-Cookie","platform_session="+token+"; Path=/api/platform; HttpOnly; SameSite=Strict; Max-Age=28800"+secure());
                 reply(exchange,200,service.view(user)); return;
+                }
             }
             String token=cookie(exchange); Session session=sessions.get(token);
             if(session==null||!session.expires().isAfter(Instant.now())) { sessions.remove(token); reply(exchange,401,Map.of("error","กรุณาเข้าสู่แพลตฟอร์ม")); return; }
+            synchronized(service) {
+            boolean valid;
+            try { valid=session.version()==service.sessionVersion(session.userId()); } catch(SecurityException e) { valid=false; }
+            if(!valid) { sessions.remove(token); reply(exchange,401,Map.of("error","สิทธิ์หรือรหัสผ่านเปลี่ยน กรุณาเข้าสู่ระบบใหม่")); return; }
             if(path.equals("/api/platform/state")&&method.equals("GET")) reply(exchange,200,service.view(session.userId()));
             else if(path.equals("/api/platform/command")&&write) reply(exchange,200,service.command(session.userId(),body(exchange)));
             else if(path.equals("/api/platform/logout")&&write) {
                 sessions.remove(token); exchange.getResponseHeaders().add("Set-Cookie","platform_session=; Path=/api/platform; HttpOnly; SameSite=Strict; Max-Age=0"+secure()); reply(exchange,200,Map.of("ok",true));
             } else reply(exchange,404,Map.of("error","Not found"));
+            }
         } catch(SecurityException e) { reply(exchange,403,Map.of("error",e.getMessage())); }
           catch(ConcurrentModificationException e) { reply(exchange,409,Map.of("error",e.getMessage())); }
           catch(IllegalArgumentException|NoSuchElementException e) { reply(exchange,400,Map.of("error",e.getMessage()==null?"ข้อมูลไม่ถูกต้อง":e.getMessage())); }

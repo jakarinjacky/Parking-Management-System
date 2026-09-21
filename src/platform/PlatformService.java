@@ -40,7 +40,7 @@ public final class PlatformService {
             for(var site:list(state,"sites")) seedHistory(site);
         } else if(adminPassword!=null && adminPassword.length()>=12) {
             addUser("superadmin",adminPassword,"super_admin","",List.of());
-        }
+        } else { throw new IllegalArgumentException("Set PLATFORM_ADMIN_PASSWORD (12–128 characters) before first startup"); }
         persist();
     }
     @SuppressWarnings("unchecked") public static Map<String,Object> map(Object o) {
@@ -57,6 +57,10 @@ public final class PlatformService {
     public static int integer(Map<String,Object> m,String key,int min,int max) {
         if(!(m.get(key) instanceof Number n)||n.doubleValue()!=n.intValue()||n.intValue()<min||n.intValue()>max) throw new IllegalArgumentException("ค่า "+key+" ไม่ถูกต้อง");
         return n.intValue();
+    }
+    public static String password(Map<String,Object> m,String key) {
+        if(!(m.get(key) instanceof String s)||s.isEmpty()||s.length()>128) throw new IllegalArgumentException("รหัสผ่านไม่ถูกต้อง");
+        return s;
     }
     private String id() { return UUID.randomUUID().toString(); }
     private String now() { return Instant.now().toString(); }
@@ -81,13 +85,38 @@ public final class PlatformService {
         var u=list(state,"users").stream().filter(v->v.get("username").equals(username)).findFirst().orElse(null);
         String salt=u==null?"AAAAAAAAAAAAAAAAAAAAAA==":u.get("salt").toString();
         String calculated=hash(password,salt);
-        if(u==null||!MessageDigest.isEqual(calculated.getBytes(StandardCharsets.UTF_8),u.get("hash").toString().getBytes(StandardCharsets.UTF_8))) throw new SecurityException("ข้อมูลเข้าสู่ระบบไม่ถูกต้อง");
+        if(u==null||Boolean.FALSE.equals(u.get("active"))||!MessageDigest.isEqual(calculated.getBytes(StandardCharsets.UTF_8),u.get("hash").toString().getBytes(StandardCharsets.UTF_8))) throw new SecurityException("ข้อมูลเข้าสู่ระบบไม่ถูกต้อง");
         return u.get("id").toString();
     }
     private Map<String,Object> user(String userId) {
         return list(state,"users").stream().filter(u->u.get("id").equals(userId)).findFirst().orElseThrow(()->new SecurityException("กรุณาเข้าสู่ระบบ"));
     }
     private boolean superUser(Map<String,Object> u) { return u.get("role").equals("super_admin"); }
+    public synchronized int sessionVersion(String userId) {
+        var u=user(userId);
+        if(Boolean.FALSE.equals(u.get("active"))) throw new SecurityException("บัญชีถูกปิดใช้งาน");
+        return ((Number)u.getOrDefault("authVersion",0)).intValue();
+    }
+    private void revoke(Map<String,Object> u) {
+        u.put("authVersion",((Number)u.getOrDefault("authVersion",0)).intValue()+1);
+    }
+    private void setPassword(Map<String,Object> u,String password) {
+        if(password.length()<12||password.length()>128) throw new IllegalArgumentException("รหัสผ่านต้องยาว 12–128 ตัวอักษร");
+        byte[] bytes=new byte[16]; new SecureRandom().nextBytes(bytes);
+        String salt=Base64.getEncoder().encodeToString(bytes);
+        u.put("salt",salt); u.put("hash",hash(password,salt)); revoke(u);
+    }
+    /** Offline recovery: stop every app instance first; preserves all business data. */
+    public synchronized void recoverAdmin(String password) throws Exception {
+        String before=SimpleJson.toJson(state);
+        try {
+            var admin=list(state,"users").stream().filter(u->u.get("username").equals("superadmin")&&superUser(u)).findFirst().orElseThrow(()->new IllegalArgumentException("superadmin not found"));
+            setPassword(admin,password); admin.put("active",true);
+            list(state,"audit").add(new LinkedHashMap<>(Map.of("id",id(),"tenantId","","siteId","","actor","server-console","action","recoverAdmin","at",now())));
+            if(list(state,"audit").size()>5000) list(state,"audit").remove(0);
+            state.put("revision",((Number)state.get("revision")).intValue()+1); persist();
+        } catch(Exception e) { state=map(Json.parse(before)); throw e; }
+    }
     private boolean owner(Map<String,Object> u) { return superUser(u)||u.get("role").equals("owner"); }
     private void require(boolean allowed) { if(!allowed) throw new SecurityException("ไม่มีสิทธิ์สำหรับบริษัทหรือลานนี้"); }
     private boolean access(Map<String,Object> u,Map<String,Object> site) {
@@ -157,7 +186,20 @@ public final class PlatformService {
             var u=user(userId); String action=string(request,"action");
             if(integer(request,"revision",0,Integer.MAX_VALUE)!=((Number)state.get("revision")).intValue()) throw new ConcurrentModificationException("มีข้อมูลใหม่ กรุณารีเฟรชก่อนบันทึก");
             String tenant=u.get("tenantId").toString(), siteId="";
-            if(action.equals("createTenant")) {
+            if(action.equals("changePassword")) {
+                login(u.get("username").toString(),password(request,"currentPassword"));
+                setPassword(u,password(request,"newPassword"));
+            } else if(Set.of("setUserActive","revokeSessions").contains(action)) {
+                require(owner(u)); var target=user(string(request,"userId"));
+                require(!target.get("id").equals(userId));
+                require(superUser(u)||target.get("tenantId").equals(u.get("tenantId"))&&Set.of("admin","staff").contains(target.get("role")));
+                require(!superUser(target)); tenant=target.get("tenantId").toString();
+                if(action.equals("setUserActive")) {
+                    if(!(request.get("active") instanceof Boolean)) throw new IllegalArgumentException("active must be boolean");
+                    target.put("active",request.get("active"));
+                }
+                revoke(target);
+            } else if(action.equals("createTenant")) {
                 require(superUser(u)); tenant=id(); addTenant(tenant,string(request,"name"),"trial");
                 addUser(string(request,"username"),string(request,"password"),"owner",tenant,List.of());
             } else if(action.equals("createSite")) {
