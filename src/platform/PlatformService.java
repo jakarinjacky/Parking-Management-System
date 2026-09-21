@@ -1,7 +1,7 @@
 package platform;
 
-import java.nio.file.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.*;
 import java.util.*;
 import java.security.*;
@@ -10,17 +10,20 @@ import javax.crypto.spec.PBEKeySpec;
 import util.SimpleJson;
 
 /** Application service: tenant authorization, layout lifecycle and parking workflows.
- * File persistence is an MVP repository, NOT a distributed SQL database.
- * Every write is copy-on-write + atomic replace; stale clients cannot overwrite newer edits.
+ * Every write is copy-on-write; stale clients cannot overwrite newer edits.
  */
 public final class PlatformService {
-    private final Path file;
+    private final PlatformStore store;
     private Map<String,Object> state;
     public static final Set<String> BUSINESSES=Set.of("CONDO","MALL","HOTEL","OFFICE","HOSPITAL","SCHOOL","PUBLIC","EVENT","CUSTOM");
     public static final Set<String> ROLES=Set.of("super_admin","owner","admin","staff");
     public PlatformService(Path file, boolean demo, String adminPassword) throws Exception {
-        this.file=file;
-        if(Files.exists(file)) { state=map(Json.parse(Files.readString(file))); return; }
+        this(new FilePlatformStore(file),demo,adminPassword);
+    }
+    public PlatformService(PlatformStore store, boolean demo, String adminPassword) throws Exception {
+        this.store=store;
+        String saved=store.load();
+        if(saved!=null&&!saved.isBlank()) { state=map(Json.parse(saved)); return; }
         state=new LinkedHashMap<>(Map.of("revision",0,"tenants",new ArrayList<>(),"sites",new ArrayList<>(),"users",new ArrayList<>(),"audit",new ArrayList<>()));
         if(demo) {
             addTenant("DEMO-A","Green Park • บริษัทตัวอย่าง", "trial");
@@ -58,11 +61,7 @@ public final class PlatformService {
     private String id() { return UUID.randomUUID().toString(); }
     private String now() { return Instant.now().toString(); }
     private void persist() throws Exception {
-        Files.createDirectories(file.toAbsolutePath().getParent());
-        Path temp=Files.createTempFile(file.toAbsolutePath().getParent(),"platform-",".tmp");
-        try { Files.writeString(temp,SimpleJson.toJson(state),StandardCharsets.UTF_8);
-            Files.move(temp,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);
-        } finally { Files.deleteIfExists(temp); }
+        store.save(SimpleJson.toJson(state));
     }
     private String hash(String password,String salt) {
         try {
@@ -119,7 +118,7 @@ public final class PlatformService {
             "tenants",list(state,"tenants").stream().filter(t->superUser(u)||t.get("id").equals(u.get("tenantId"))).toList(),
             "users",owner(u)?list(state,"users").stream().filter(v->superUser(u)||v.get("tenantId").equals(u.get("tenantId"))).map(this::publicUser).toList():List.of(),
             "audit",owner(u)?list(state,"audit").stream().filter(a->superUser(u)||a.get("tenantId").equals(u.get("tenantId"))).toList():List.of(),
-            "storage","atomic-json-mvp");
+            "storage",store.description());
     }
     /** Retention runs on reads as well as writes; an unopened/offline server cannot run background jobs. */
     private void purgeExpiredHistory() {

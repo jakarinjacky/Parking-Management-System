@@ -1,0 +1,41 @@
+services:
+  database:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: parking_platform
+      POSTGRES_USER: parking_app
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U parking_app -d parking_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [parking]
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      PLATFORM_ONLY: "true"
+      PLATFORM_DEMO: "false"
+      PLATFORM_SECURE_COOKIE: ${PLATFORM_SECURE_COOKIE:-false}
+      PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD:?set PLATFORM_ADMIN_PASSWORD in .env}
+      DATABASE_URL: jdbc:postgresql://database:5432/parking_platform
+      DB_USER: parking_app
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    ports:
+      - "${APP_BIND_IP:-0.0.0.0}:${APP_PORT:-8080}:8080"
+    networks: [parking]
+
+networks:
+  parking:
+
+volumes:
+  postgres_data:
