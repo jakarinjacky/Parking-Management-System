@@ -76,7 +76,7 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   assert.equal(await page.locator('.grid [data-x="8"][data-y="0"]').getAttribute('data-cell'),null);
   await page.locator('[data-action=redo]').click();
   await page.locator('[data-action=saveLayout]').click();
-  await page.waitForFunction(()=>document.querySelector('.canvas-toolbar')?.textContent.includes('บันทึกแล้ว'));
+  await page.locator('.canvas-toolbar').filter({hasText:'บันทึกแล้ว'}).waitFor();
   await page.reload();
   await page.locator('[data-action=editSite]').first().click();
   for (const [i,id] of placed.entries()) assert.equal(await page.locator(`.grid [data-x="${i}"][data-y="0"]`).getAttribute('data-cell'),id);
