@@ -90,7 +90,7 @@
             content=heading('รถเข้า–ออก',`${escape(s.name)} · ใช้ผังที่เผยแพร่เท่านั้น`,button('checkin','＋ รับรถเข้าลาน',true,writeDisabled()||!s.active||!s.published.length));
             content+=`<div class="metrics">${metric('ช่องจอด',s.published.filter(c=>c.type==='SLOT').length)}${metric('รถในลาน',active.length)}${metric('ค่าจอด / ชั่วโมง',money(s.rate))}${metric('ฟรีช่วงแรก',s.freeMinutes+' นาที')}</div>`;
             content+=`<div class="canvas-shell"><div class="canvas-toolbar"><select id="floorPicker" aria-label="ชั้น">${options(Object.fromEntries(Array.from({length:8},(_,i)=>[i+1,`ชั้น ${i+1}`])),floor)}</select><span class="help">แตะช่องจอดเพื่อแสดงเส้นทางแนะนำ</span></div><div class="canvas-scroll">${grid(s.published,active)}</div></div>`;
-            content+=`<h3 class="section-gap">รถที่กำลังจอด</h3>`+table(['ทะเบียน','ช่อง','เวลาเข้า','ค่าจอด ณ ตอนนี้',''],active.map(t=>[escape(t.licensePlate),escape(t.slotNumber),time(t.entryTime),money(fee(t)),button('checkout','รับเงินสด / รถออก',false,writeDisabled(),`data-id="${escape(t.ticketId)}"`)]));
+            content+=`<h3 class="section-gap">รถที่กำลังจอด</h3>`+table(['ทะเบียน','ช่อง','เวลาเข้า','ค่าจอด ณ ตอนนี้',''],active.map(t=>[escape(t.licensePlate),escape(t.slotNumber),time(t.entryTime),money(fee(t)),button('checkout',t.paidAt?'ชำระแล้ว / รถออก':'รับเงินสด / รถออก',false,writeDisabled(),`data-id="${escape(t.ticketId)}"`)]));
         } else if(tab==='history') {
             const rows=historyRows();
             content=heading('ประวัติย้อนหลัง / Excel','แยกตามลาน · เวลาบนหน้าจอเป็นเวลาท้องถิ่น · Excel ใช้ ISO UTC');
@@ -148,10 +148,11 @@
         mutate(()=>{const id=crypto.randomUUID();draft.push({id,type,x,y,floor,label:type==='SLOT'?`F${floor}-${x+1}-${y+1}`:C.types[type],slotType:'STANDARD',rotation:0,oneWay:false});selected=id;});
     }
     function fee(t) {
-        const seconds=Math.max(0,Math.floor((Date.now()-new Date(t.entryTime).getTime())/1000));
+        if(t.paidAt)return Number(t.fee||0);
+        const seconds=Math.max(0,Math.floor((Date.now()+(current()?.sample?Number(current().simulationMinutes||0)*60000:0)-new Date(t.entryTime).getTime())/1000));
         const hours=Math.ceil(Math.max(0,seconds-t.freeMinutes*60)/3600),cap=Number(t.dailyCap||0),rate=Number(t.rate);
         const gross=cap>0?Math.floor(hours/24)*Math.min(24*rate,cap)+Math.min((hours%24)*rate,cap):hours*rate;
-        return Math.ceil(gross*(100-Math.max(t.memberDiscountPercent||0,t.couponDiscountPercent||0))/100);
+        return Math.ceil(gross*(100-Math.max(t.memberDiscountPercent||0,t.couponDiscountPercent||0))/100)+Number(t.lostTicketPenalty||0);
     }
     function historyRows() { return current().tickets.filter(t=>{const date=new Date(t.entryTime), local=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;return (!filters.from||local>=filters.from)&&(!filters.to||local<=filters.to)&&t.licensePlate.toLowerCase().includes(filters.plate.toLowerCase());}).slice().sort((a,b)=>b.entryTime.localeCompare(a.entryTime)); }
     function field(name,label,type='text',value='',extra='') { return `<label>${label}<input name="${name}" type="${type}" value="${escape(value)}" required maxlength="160" ${extra}></label>`; }
@@ -228,7 +229,7 @@
             const update=()=>{const available=siteOptions(vehicle.value);slot.innerHTML=Object.keys(available).length?options(available):'<option value="">ไม่มีช่องว่างสำหรับรถประเภทนี้</option>';slot.required=true;};
             vehicle.onchange=update;update();
         }
-        if(name==='checkout') {const t=s.tickets.find(t=>t.ticketId===element.dataset.id);modal('ยืนยันรับเงินสดและนำรถออก',`<p>ทะเบียน ${escape(t.licensePlate)} · ช่อง ${escape(t.slotNumber)}</p><h2>${money(fee(t))}</h2><p>ยอดประมาณการ ณ ตอนนี้ เซิร์ฟเวอร์คำนวณอีกครั้งเมื่อยืนยัน ยังไม่มี Payment Gateway หรือคำสั่งเปิดไม้กั้น</p><label class="check-label"><input type="checkbox" required>รับเงินสดเรียบร้อยแล้ว / ไม่มีค่าบริการ</label>`,()=>command('checkout',{ticketId:t.ticketId}));}
+        if(name==='checkout') {const t=s.tickets.find(t=>t.ticketId===element.dataset.id);modal(t.paidAt?'ยืนยันนำรถที่ชำระแล้วออก':'ยืนยันรับเงินสดและนำรถออก',`<p>ทะเบียน ${escape(t.licensePlate)} · ช่อง ${escape(t.slotNumber)}</p><h2>${money(fee(t))}</h2><p>ยอดประมาณการ ณ ตอนนี้ เซิร์ฟเวอร์คำนวณอีกครั้งเมื่อยืนยัน ยังไม่มี Payment Gateway หรือคำสั่งเปิดไม้กั้น</p><label class="check-label"><input type="checkbox" required>${t.paidAt?'ตรวจแล้วว่าตั๋วชำระเรียบร้อย ยืนยันนำรถออก':'รับเงินสดเรียบร้อยแล้ว / ไม่มีค่าบริการ'}</label>`,()=>command('checkout',{ticketId:t.ticketId}));}
         if(name==='member')modal('เพิ่มสมาชิก / ผู้เข้าพัก',field('name','ชื่อสมาชิก')+field('plate','ทะเบียน')+field('room','เลขห้อง / หน่วยงาน')+field('starts','วันเริ่มสิทธิ์ / เข้าพัก','date')+field('expires','วันหมดอายุ / ออก','date'),f=>command('addMember',Object.fromEntries(f)));
         if(name==='reserve')modal('จองช่องล่วงหน้า',field('plate','ทะเบียน')+select('slotId','ช่องจอด',siteOptions())+field('from','เริ่ม','datetime-local')+field('to','สิ้นสุด','datetime-local'),f=>command('reserve',{plate:f.get('plate'),slotId:f.get('slotId'),from:new Date(f.get('from')).toISOString(),to:new Date(f.get('to')).toISOString()}));
         if(name==='cancelReservation') {if(!confirm('ยกเลิกการจองนี้?'))return;await command('cancelReservation',{reservationId:element.dataset.id});showWorkspace();}

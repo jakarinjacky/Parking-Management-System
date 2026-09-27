@@ -22,7 +22,7 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await page.locator('#loginForm [name=password]').fill('DemoPass123!');
   await page.locator('#loginForm button').click();
   await page.locator('#workspace').waitFor({state:'visible'});
-  await page.screenshot({path:path.join(tmp,'platform-desktop.png'),fullPage:true});
+  await page.screenshot({animations:'disabled',path:path.join(tmp,'platform-desktop.png'),fullPage:true});
   await page.locator('[data-action=editSite]').first().click();
   await page.locator('[data-action=publish]').click();
   await page.locator('#notice').filter({hasText:'เผยแพร่ผังแล้ว'}).waitFor();
@@ -36,10 +36,69 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   // The main dashboard shares this session, site state, and ledger with the editor.
   await page.goto('http://localhost:8080/dashboard.html');
   await page.locator('#workspace').waitFor({state:'visible'});
-  assert(await page.locator('#slotMap').innerText().then(t=>t.includes('BROWSER-01')));
-  await page.locator('[data-tab=exit]').click();
-  await page.locator('[data-exit]').click();
+  assert((await page.locator('#slotsGrid').innerText()).includes('BROWSER-01'));
+  assert((await page.locator('.brand-title').innerText()).includes('Smart Parking System'));
+  assert((await page.locator('#displayBoardMessage').innerText()).includes('ว่าง'));
+  const tab=async name=>page.locator(`.tab-btn[onclick="switchTab('${name}')"]`).click();
+  await page.screenshot({animations:'disabled',path:path.join(tmp,'dashboard-reference-desktop.png'),fullPage:true});
+  await page.locator('[data-slot=A6]').click();
+  await page.locator('[data-park=A6]').click();
+  await page.locator('#licensePlate').fill('UI-ENTRY');
+  await page.locator('#btnIssueTicket').click();
+  await page.locator('#ticketModalOverlay.active').waitFor();
+  assert((await page.locator('#modalSlot').innerText()).includes('A-6'));
+  await page.locator('#ticketModalOverlay .modal-close-btn').click();
+  await tab('lot-view');
+  assert((await page.locator('#slotsGrid').innerText()).includes('UI-ENTRY'));
+  await tab('exit-cashier');
+  await page.locator('#exitSearchQuery').fill('BROWSER-01');
+  await page.locator('button[onclick="searchTicketForExit()"] ').click();
+  await page.locator('#feeResultCard').waitFor({state:'visible'});
+  await page.locator('#paymentConfirmed').check();
+  await page.locator('button[onclick="submitPayment()"] ').click();
+  await page.locator('#receiptModalOverlay.active').waitFor();
+  assert((await page.locator('#rcpPlate').innerText()).includes('BROWSER-01'));
+  await page.locator('button[onclick="finishPaymentAndOpenExitGate()"] ').click();
   await page.locator('#notice').filter({hasText:'บันทึกรถออกแล้ว'}).waitFor();
+  await tab('tickets-history');
+  assert((await page.locator('#ticketsTableBody').innerText()).includes('BROWSER-01'));
+  await tab('memberships');
+  for(const [id,value]of Object.entries({memberId:'DASH-001',memberName:'Dashboard member',memberPlate:'DASH-MEMBER',memberRoom:'D101',memberFrom:'2026-01-01',memberUntil:'2030-12-31'}))await page.locator('#'+id).fill(value);
+  await page.locator('form[onsubmit="createMembership(event)"] button').click();
+  await page.locator('#membershipsList').getByText('Dashboard member',{exact:false}).waitFor();
+  await tab('reservations');
+  await page.locator('#reservationPlate').fill('DASH-BOOKING');
+  await page.locator('#reservationSlot').selectOption('A4');
+  await page.locator('#reservationStart').fill('2030-12-01T10:00');
+  await page.locator('#reservationEnd').fill('2030-12-01T11:00');
+  await page.locator('form[onsubmit="createReservation(event)"] button').click();
+  await page.locator('#reservationsList').getByText('DASH-BOOKING').waitFor();
+  await page.locator('[data-cancel]').click();
+  await page.locator('#reservationsList').getByText('CANCELLED').waitFor();
+  await tab('dashboard');
+  assert((await page.locator('#dashboardMessage').innerText()).includes('รับชำระ 1'));
+  await tab('ai-ops');
+  await page.locator('#copilotInputText').fill('มีที่จอดว่างชั้นไหน');
+  await page.locator('button[onclick="submitCopilotChat()"] ').click();
+  await page.locator('#aiCopilotChatLog .chat-bubble.ai').filter({hasText:'ชั้น 1'}).waitFor();
+  await tab('entry-gate');
+  await page.locator('#licensePlate').fill('ANPR-TEST');
+  await page.locator('#btnTriggerAnpr').click();
+  await page.locator('#anprTargetText').filter({hasText:'จำลอง ANPR'}).waitFor();
+  await tab('oop-docs');
+  assert((await page.locator('#tab-oop-docs').innerText()).includes('OOP'));
+  await tab('vehicle-history');
+  const liveDownload=page.waitForEvent('download');await page.locator('#historyExportButton').click();
+  await (await liveDownload).saveAs(path.join(tmp,'live-history.xlsx'));
+  await page.setViewportSize({width:390,height:844});
+  await tab('lot-view');
+  await page.screenshot({animations:'disabled',path:path.join(tmp,'dashboard-reference-mobile.png'),fullPage:true});
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  for(const mobileTab of ['entry-gate','exit-cashier','reservations','memberships','dashboard','ai-ops','oop-docs']){
+    await tab(mobileTab);
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`mobile overflow: ${mobileTab}`);
+  }
+  await page.setViewportSize({width:1440,height:1000});
   await page.goto('http://localhost:8080/platform.html');
   await page.locator('#workspace').waitFor({state:'visible'});
   await page.locator('[data-action=openSite]').first().click();
@@ -60,7 +119,7 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   }
   await page.locator('[data-action=publish]').click();
   await page.locator('#notice').filter({hasText:'เผยแพร่ผังแล้ว'}).waitFor();
-  await page.screenshot({path:path.join(tmp,'platform-editor.png'),fullPage:true});
+  await page.screenshot({animations:'disabled',path:path.join(tmp,'platform-editor.png'),fullPage:true});
   for(const nav of ['members','devices','settings','users','audit'])await page.locator(`[data-nav=${nav}]`).click();
   await page.locator('[data-nav=settings]').click();
   await page.locator('[data-action=pricing]').click();
@@ -79,7 +138,7 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await page.setViewportSize({width:390,height:844});
   await page.locator('[data-nav=sites]').click();
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-  await page.screenshot({path:path.join(tmp,'platform-mobile.png'),fullPage:true});
+  await page.screenshot({animations:'disabled',path:path.join(tmp,'platform-mobile.png'),fullPage:true});
   await page.locator('#logoutButton').click();
   await page.locator('#loginScreen').waitFor({state:'visible'});
   await page.locator('#loginForm [name=username]').fill('staff');
@@ -91,8 +150,8 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await page.goto('http://localhost:8080/dashboard.html');
   await page.locator('#workspace').waitFor({state:'visible'});
   assert.equal(await page.locator('#sitePicker option').count(),1);
-  await page.locator('[data-tab=history]').click();
-  assert.equal(await page.locator('#exportButton').isVisible(),false);
+  assert.equal(await page.locator(".tab-btn[onclick=\"switchTab('vehicle-history')\"]").isVisible(),false);
+  assert.equal(await page.locator('#historyExportButton').isVisible(),false);
   await page.goto('http://localhost:8080/platform.html');
   await page.locator('#workspace').waitFor({state:'visible'});
   await page.getByRole('button',{name:'เปลี่ยนรหัสผ่าน',exact:true}).click();
@@ -162,5 +221,5 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   assert(!(await onboarding.locator('#main').innerText()).includes('superadmin'));
   console.log('Browser PASS: shared dashboard session/ledger, parking, cash checkout, XLSX, custom road layout, all tabs, mobile, staff permissions');
   console.log('QA artifacts: '+tmp);
- } finally {if(browser)await browser.close();server.kill('SIGTERM');if(onboardingServer)onboardingServer.kill('SIGTERM');}
+ } finally {if(process.env.CI){fs.mkdirSync('browser-artifacts',{recursive:true});for(const name of fs.readdirSync(tmp).filter(n=>n.endsWith('.png')))fs.copyFileSync(path.join(tmp,name),path.join('browser-artifacts',name));}if(browser)await browser.close();server.kill('SIGTERM');if(onboardingServer)onboardingServer.kill('SIGTERM');}
 })().catch(e=>{console.error(e);process.exitCode=1;});
