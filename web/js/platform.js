@@ -8,6 +8,7 @@
     const time=t=>t?new Date(t).toLocaleString('th-TH'):'—';
     const roles={super_admin:'เจ้าของแพลตฟอร์ม',owner:'เจ้าของบริษัท',admin:'ผู้ดูแล',staff:'พนักงาน'};
     let allState,tenantScope=new URLSearchParams(location.search).get('tenant')||'',state,siteId='',tab='sites',preview=false,busy=false,draft=[],dirty=false,tool='SELECT',floor=1,selected='',undo=[],redo=[],routeIds=[],noticeTimer,modalSubmit;
+    let analyticsDays='30';
     let filters={from:'',to:'',plate:''};
     // Platform operators explicitly enter one customer's workspace. Customers are
     // already tenant-filtered by the API; this filter only scopes the operator UI.
@@ -42,8 +43,8 @@
     function loadDraft() { draft=C.clone(current()?.draft||[]); dirty=false; selected=''; undo=[]; redo=[]; routeIds=[]; }
     function showWorkspace() {
         $('loginScreen').hidden=true; $('workspace').hidden=false;
-        if(platformOwner()&&!tenantScope) tab='customers';
-        if(!platformOwner()&&tab==='customers') tab='sites';
+        if(platformOwner()&&!tenantScope&&!['analytics','customers'].includes(tab)) tab='analytics';
+        if(!platformOwner()&&['analytics','customers'].includes(tab)) tab='sites';
         if(!state.sites.some(s=>s.id===siteId)) siteId=state.sites[0]?.id||'';
         $('accountName').textContent=`${state.user.username} · ${roles[state.user.role]}`;
         $('modeBanner').textContent=preview?'ตัวอย่างอ่านอย่างเดียว • ไม่มีการบันทึกหรือควบคุมอุปกรณ์จริง':current()?.sample?'ลานตัวอย่าง · ทะเบียน ประวัติ และอุปกรณ์เป็นข้อมูลสมมุติ · แยกบริษัทจากข้อมูลจริง':'ข้อมูลจริงบนเซิร์ฟเวอร์ • อุปกรณ์รองรับ LED bench เมื่อเปิด Gateway';
@@ -54,8 +55,8 @@
         document.querySelectorAll('a[href^="dashboard.html"]').forEach(a=>a.href=platformOwner()&&tenantScope?`dashboard.html?tenant=${encodeURIComponent(tenantScope)}`:'dashboard.html');
         $('sitePicker').hidden=platformOwner()&&!tenantScope;
         $('sitePicker').innerHTML=state.sites.length?options(Object.fromEntries(state.sites.map(s=>[s.id,s.name])),siteId):'<option>ยังไม่มีลานจอด</option>';
-        const pages={...(platformOwner()?{customers:'♙  ลูกค้าแพลตฟอร์ม'}:{}),sites:'▦  ลานจอดทั้งหมด',editor:'▧  ออกแบบผัง',operations:'↔  รถเข้า–ออก',history:'◷  ประวัติ / Excel',members:'◎  สมาชิก / การจอง',devices:'⌁  อุปกรณ์',settings:'⚙  ตั้งค่าลาน',users:'♙  ทีมงานของบริษัท',audit:'≡  บันทึกกิจกรรม'};
-        $('nav').innerHTML=Object.entries(pages).filter(([id])=>platformOwner()&&!tenantScope?id==='customers':owner()||!['editor','settings','users','audit'].includes(id)&& (manager()||!['history','members','devices'].includes(id))).map(([id,label])=>`<button data-nav="${id}" class="${id===tab?'active':''}">${label}</button>`).join('');
+        const pages={...(platformOwner()?{analytics:'▥  Dashboard ลูกค้า',customers:'♙  ลูกค้าแพลตฟอร์ม'}:{}),sites:'▦  ลานจอดทั้งหมด',editor:'▧  ออกแบบผัง',operations:'↔  รถเข้า–ออก',history:'◷  ประวัติ / Excel',members:'◎  สมาชิก / การจอง',devices:'⌁  อุปกรณ์',settings:'⚙  ตั้งค่าลาน',users:'♙  ทีมงานของบริษัท',audit:'≡  บันทึกกิจกรรม'};
+        $('nav').innerHTML=Object.entries(pages).filter(([id])=>platformOwner()&&!tenantScope?['analytics','customers'].includes(id):owner()||!['editor','settings','users','audit'].includes(id)&& (manager()||!['history','members','devices'].includes(id))).map(([id,label])=>`<button data-nav="${id}" class="${id===tab?'active':''}">${label}</button>`).join('');
         render();
     }
     function heading(title,subtitle,actions='') { return `<div class="page-title"><div><span class="eyebrow">GREENPARK / ${escape(tab.toUpperCase())}</span><h1>${title}</h1><p>${subtitle}</p></div><div class="actions">${actions}</div></div>`; }
@@ -63,13 +64,26 @@
     function empty(text) { return `<div class="empty">${text}</div>`; }
     function metric(label,value) { return `<div class="metric"><span>${label}</span><strong>${value}</strong></div>`; }
     function table(headers,rows) { return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`; }
+    function analyticsDashboard() {
+        const report=allState.platformAnalytics, data=report?.windows?.[analyticsDays];
+        let html=heading('Dashboard ลูกค้าแพลตฟอร์ม','ภาพรวมการเติบโตและการใช้งานจริงของบริษัทลูกค้า',`<label>ช่วงรายงาน<select id="analyticsDays">${options({'7':'7 วัน','30':'30 วัน','90':'90 วัน'},analyticsDays)}</select></label>`);
+        if(!data) return html+empty('ยังไม่มีรายงานจากเซิร์ฟเวอร์ · กรุณารีเฟรชหลังอัปเดตระบบ');
+        const customers=data.customers, logins=customers.reduce((n,c)=>n+c.logins,0), actions=customers.reduce((n,c)=>n+c.actions,0);
+        html+=`<div class="metrics">${metric('ลูกค้าทั้งหมด',customers.length)}${metric('ลูกค้าใหม่ในช่วงนี้',data.newCustomers)}${metric('ลูกค้าที่ใช้งาน',data.activeCustomers)}${metric('ลูกค้าเดิมที่ใช้งาน',data.returningCustomers)}${metric('ไม่พบการใช้งานในช่วงนี้',data.inactiveCustomers)}${metric('เข้าสู่ระบบสำเร็จ',logins)}${metric('รายการที่บันทึกสำเร็จ',actions)}</div>`;
+        html+=`<section class="card"><h2>แนวโน้มการใช้งานรายวัน</h2><p>จำนวนบริษัทที่เข้าสู่ระบบหรือบันทึกรายการ · เวลาไทย</p><div class="usage-chart" role="img" aria-label="แนวโน้มลูกค้าที่ใช้งานรายวัน รายละเอียดอยู่ในตารางด้านล่าง">${data.trend.map(d=>`<div class="usage-column" title="${d.day}: ${d.active} บริษัท"><span style="height:${Math.max(2,110*d.active/Math.max(1,...data.trend.map(x=>x.active)))}px"></span><small>${d.day.slice(8)}</small></div>`).join('')}</div><details><summary>ดูตัวเลขรายวัน</summary>${table(['วันที่','ลูกค้าใหม่','บริษัทที่ใช้งาน','เข้าสู่ระบบ','บันทึกรายการ'],data.trend.map(d=>[d.day,d.newCustomers,d.active,d.logins,d.actions]))}</details></section>`;
+        html+=`<section class="card section-gap"><h2>รายงานแยกตามลูกค้า</h2><p>เรียงตามจำนวนการใช้งานมากที่สุด</p>${customers.length?table(['บริษัท','กลุ่มลูกค้า','เริ่มเป็นลูกค้า','ลานจริง','เข้าสู่ระบบ','บันทึกรายการ','วันที่ใช้งาน','ใช้งานล่าสุด',''],customers.map(c=>[escape(c.name),({new:'ใหม่',existing:'เดิม',unknown:'ไม่ทราบวันเริ่ม'})[c.cohort],c.createdAt?time(c.createdAt):'ไม่ทราบ',c.sites,c.logins,c.actions,c.activeDays,time(c.lastActiveAt),button('enterTenant','ดูแลลูกค้า →',false,false,`data-id="${escape(c.id)}"`)])):empty('ยังไม่มีลูกค้าจริง · เพิ่มลูกค้าได้ที่เมนูลูกค้าแพลตฟอร์ม')}</section>`;
+        html+=`<section class="card section-gap"><h3>วิธีอ่านรายงาน</h3><p>ลูกค้าใหม่ = บริษัทที่สร้างในช่วงที่เลือก · ลูกค้าเดิม = บริษัทที่สร้างก่อนช่วงนั้น · การใช้งาน = เข้าสู่ระบบสำเร็จหรือบันทึกคำสั่งสำเร็จ ไม่ใช่เวลาที่เปิดหน้าเว็บ</p><p>เริ่มเก็บสถิติ ${time(report.startedAt)} เก็บยอดรายวัน 90 วัน ไม่นับการทำงานของเจ้าของแพลตฟอร์ม บริษัททดลอง และรายการในลานตัวอย่าง ข้อมูลก่อนเริ่มเก็บไม่ได้เติมย้อนหลัง</p><p>ลูกค้าไม่ทราบวันเริ่ม ${data.unknownCreated} บริษัท แสดงแยกจากลูกค้าใหม่/เดิม · “ไม่พบการใช้งาน” ไม่ได้หมายถึงยกเลิกบริการ · อัปเดต ${time(report.generatedAt)}</p></section>`;
+        return html;
+    }
     function render() {
         let content=''; const s=current();
-        if(tab!=='customers'&&tab!=='sites'&&tab!=='users'&&tab!=='audit'&&!s) {
+        if(tab!=='analytics'&&tab!=='customers'&&tab!=='sites'&&tab!=='users'&&tab!=='audit'&&!s) {
             $('main').innerHTML=heading('ยังไม่มีลานจอด','สร้างลานก่อนใช้เครื่องมือออกแบบและรับรถ')+`<div class="card onboarding"><h2>เริ่มออกแบบลานจอด</h2><p>ลานตัวอย่างมีถนน 2 ชั้น ช่องจอด กล้องและไม้กั้นจำลอง พร้อมประวัติรถ 3 เดือน ข้อมูลทั้งหมดระบุว่าเป็นตัวอย่างและอยู่ในบริษัททดลองแยกต่างหาก</p><div class="actions">${state.user.role==='super_admin'&&!allState.tenants.some(t=>t.sample)?button('sampleWorkspace','＋ สร้างพื้นที่ทดลอง',true,writeDisabled()):''}${state.user.role==='super_admin'?button('tenant','สร้างบริษัทจริง',false,writeDisabled()):''}${owner()&&state.tenants.length?button('createSite','สร้างลานจอดจริง',false,writeDisabled()):''}</div></div>`;
             return;
         }
-        if(tab==='customers'&&platformOwner()) {
+        if(tab==='analytics'&&platformOwner()) {
+            content=analyticsDashboard();
+        } else if(tab==='customers'&&platformOwner()) {
             content=heading('ศูนย์เจ้าของแพลตฟอร์ม','สร้างบัญชีลูกค้าและเลือกบริษัทที่ต้องการดูแล',button('tenant','＋ เพิ่มลูกค้า / เจ้าของบริษัท',true,writeDisabled()));
             content+=`<div class="metrics">${metric('บริษัทลูกค้า',allState.tenants.filter(t=>!t.sample).length)}${metric('ลานจอด',allState.sites.length)}${metric('บัญชีลูกค้า',allState.users.filter(u=>u.role!=='super_admin').length)}</div>`;
             content+=`<div class="card"><h2>บัญชีลูกค้าแยกบริษัท</h2><p>ลูกค้าเข้าสู่ระบบด้วยบัญชีของตนเอง เห็นเฉพาะลาน ประวัติ รายได้ และทีมงานในบริษัทของตน เจ้าของแพลตฟอร์มเลือกดูแลลูกค้าได้ทีละบริษัท</p><a href="platform.html">ลิงก์เข้าสู่ระบบสำหรับลูกค้า</a></div>`;
@@ -126,6 +140,7 @@
             content+=`<section class="card section-gap"><h3>แบบร่างถนนโค้ง • ชั้น ${floor}</h3><p>พื้นที่ 100 × 100 เมตร เป็นแบบร่างแยกจาก Grid ที่ใช้รับรถ ยังไม่ตรวจรัศมีเลี้ยวหรือเชื่อมเส้นทางอัตโนมัติ</p>${button('roadCurve','เพิ่มถนนโค้ง',false,writeDisabled())}<svg viewBox="-6 -6 112 112" role="img" aria-label="แบบร่างถนนโค้ง" style="width:100%;max-width:540px;background:#263b35">${curves.map(c=>`<path d="M ${c.x1} ${c.y1} Q ${c.cx} ${c.cy} ${c.x2} ${c.y2}" fill="none" stroke="#8ca69e" stroke-width="${c.width}"/><path d="M ${c.x1} ${c.y1} Q ${c.cx} ${c.cy} ${c.x2} ${c.y2}" fill="none" stroke="white" stroke-width="0.3" stroke-dasharray="2 2"/>`).join('')}</svg>${table(['ชื่อ','กว้าง (ม.)',''],curves.map(c=>[escape(c.label),c.width,button('removeCurve','ลบ',false,writeDisabled(),`data-id="${escape(c.id)}"`)]))}</section>`;
         }
         $('main').innerHTML=content;
+        $('analyticsDays')?.addEventListener('change',e=>{analyticsDays=e.target.value;render();});
         if(tab==='settings') $('settingsForm').onsubmit=async e=>{e.preventDefault(); const f=new FormData(e.target); await safely(async()=>{await command('configure',{name:f.get('name'),address:f.get('address'),rate:Number(f.get('rate')),freeMinutes:Number(f.get('freeMinutes')),active:f.has('active'),features:{membership:f.has('membership'),reservation:f.has('reservation')}}); showWorkspace(); notice('บันทึกการตั้งค่าแล้ว');});};
         if(tab==='editor'&&$('cellForm')) $('cellForm').onsubmit=e=>{e.preventDefault(); const f=new FormData(e.target); mutate(()=>{const c=draft.find(c=>c.id===selected); c.label=f.get('label').trim(); c.slotType=f.get('slotType'); c.rotation=Number(f.get('rotation')); c.oneWay=f.has('oneWay');});};
         $('floorPicker')?.addEventListener('change',e=>{floor=Number(e.target.value); selected='';routeIds=[];render();});
@@ -265,7 +280,7 @@
     $('main').addEventListener('input',e=>{if(['filterFrom','filterTo','filterPlate'].includes(e.target.id)){const exportButton=$('main').querySelector('[data-action="export"]');if(exportButton)exportButton.disabled=true;}});
     $('main').addEventListener('dragover',e=>{if(tab==='editor'&&e.target.closest('.cell'))e.preventDefault();});
     $('main').addEventListener('drop',e=>{const cell=e.target.closest('.cell');if(!cell||tab!=='editor')return;e.preventDefault();safely(()=>{const data=JSON.parse(e.dataTransfer.getData('text/plain')),x=Number(cell.dataset.x),y=Number(cell.dataset.y);if(data.tool&&C.types[data.tool])putCell(x,y,data.tool);else if(data.id){if(draft.some(c=>c.floor===floor&&c.x===x&&c.y===y))throw new Error('ตำแหน่งนี้มีชิ้นส่วนแล้ว');if(!draft.some(c=>c.id===data.id))return;mutate(()=>{const c=draft.find(c=>c.id===data.id);c.x=x;c.y=y;c.floor=floor;selected=c.id;});}});});
-    $('nav').onclick=e=>{const b=e.target.closest('[data-nav]');if(!b||!checkDirty())return;tab=b.dataset.nav;if(tab==='customers'){tenantScope='';acceptState(allState);}loadDraft();showWorkspace();};
+    $('nav').onclick=e=>{const b=e.target.closest('[data-nav]');if(!b||!checkDirty())return;tab=b.dataset.nav;if(['customers','analytics'].includes(tab)){tenantScope='';acceptState(allState);}loadDraft();showWorkspace();};
     $('backToCustomers').onclick=()=>{if(!checkDirty())return;tenantScope='';tab='customers';siteId='';acceptState(allState);loadDraft();showWorkspace();};
     $('sitePicker').onchange=e=>{if(!checkDirty()){e.target.value=siteId;return;}siteId=e.target.value;loadDraft();showWorkspace();};
     $('refreshButton').onclick=()=>safely(async()=>{if(!checkDirty())return;if(!preview)acceptState(await api('state'));loadDraft();showWorkspace();notice('อัปเดตแล้ว');});

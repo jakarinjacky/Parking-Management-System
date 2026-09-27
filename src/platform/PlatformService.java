@@ -42,7 +42,7 @@ public final class PlatformService {
     }
     private void initialize(boolean demo,String adminPassword) throws Exception {
         String saved=store.load();
-        if(saved!=null&&!saved.isBlank()) { state=map(Json.parse(saved)); return; }
+        if(saved!=null&&!saved.isBlank()) { state=map(Json.parse(saved)); PlatformAnalytics.initialize(state); persist(); return; }
         state=new LinkedHashMap<>(Map.of("revision",0,"tenants",new ArrayList<>(),"sites",new ArrayList<>(),"users",new ArrayList<>(),"audit",new ArrayList<>()));
         if(demo) {
             addTenant("DEMO-A","Green Park • บริษัทตัวอย่าง", "trial");
@@ -60,6 +60,7 @@ public final class PlatformService {
         } else if(adminPassword!=null && adminPassword.length()>=12) {
             addUser("superadmin",adminPassword,"super_admin","",List.of());
         } else { throw new IllegalArgumentException("Set PLATFORM_ADMIN_PASSWORD (12–128 characters) before first startup"); }
+        PlatformAnalytics.initialize(state);
         persist();
     }
     @SuppressWarnings("unchecked") public static Map<String,Object> map(Object o) {
@@ -100,7 +101,7 @@ public final class PlatformService {
         list(state,"users").add(new LinkedHashMap<>(Map.of("id",id(),"username",username,"role",role,"tenantId",tenant,"siteIds",new ArrayList<>(sites),"salt",salt,"hash",hash(password,salt))));
     }
     public synchronized String login(String username,String password) {
-        return atomic(()->loginLocked(username,password));
+        return atomic(()->{ String uid=loginLocked(username,password); if(!superUser(user(uid))) { PlatformAnalytics.record(state,user(uid),"","logins"); persist(); } return uid; });
     }
     private String loginLocked(String username,String password) {
         if(username==null||password==null||password.length()>128) throw new SecurityException("ข้อมูลเข้าสู่ระบบไม่ถูกต้อง");
@@ -188,11 +189,13 @@ public final class PlatformService {
             }
             sites.add(copy);
         }
-        return Map.of("revision",state.get("revision"),"user",publicUser(u),"sites",sites,
+        var result=new LinkedHashMap<String,Object>(Map.of("revision",state.get("revision"),"user",publicUser(u),"sites",sites,
             "tenants",list(state,"tenants").stream().filter(t->superUser(u)||t.get("id").equals(u.get("tenantId"))).toList(),
             "users",owner(u)?list(state,"users").stream().filter(v->superUser(u)||v.get("tenantId").equals(u.get("tenantId"))).map(this::publicUser).toList():List.of(),
             "audit",owner(u)?list(state,"audit").stream().filter(a->superUser(u)||a.get("tenantId").equals(u.get("tenantId"))).toList():List.of(),
-            "storage",store.description());
+            "storage",store.description()));
+        if(superUser(u)) result.put("platformAnalytics",PlatformAnalytics.report(state));
+        return result;
     }
     private Instant siteTime(Map<String,Object> site) {
         return Instant.now().plusSeconds(Boolean.TRUE.equals(site.get("sample"))?PricingPolicy.number(site,"simulationMinutes",0)*60:0);
@@ -228,7 +231,7 @@ public final class PlatformService {
             var result=DeviceGateway.event(d,token,request); persist(); return result;
         });
     }
-    private void addTenant(String id,String name,String plan) { list(state,"tenants").add(new LinkedHashMap<>(Map.of("id",id,"name",name,"plan",plan))); }
+    private void addTenant(String id,String name,String plan) { list(state,"tenants").add(new LinkedHashMap<>(Map.of("id",id,"name",name,"plan",plan,"createdAt",now()))); }
     private Map<String,Object> createSite(String tenant,String name,String type) {
         if(!BUSINESSES.contains(type)) throw new IllegalArgumentException("แม่แบบไม่ถูกต้อง");
         var cells=ParkingLayout.template(type); var site=new LinkedHashMap<String,Object>();
@@ -271,7 +274,7 @@ public final class PlatformService {
             String tenant=u.get("tenantId").toString(), siteId="";
             String deviceSecret=null; Map<String,Object> operationResult=null;
             if(action.equals("changePassword")) {
-                login(u.get("username").toString(),password(request,"currentPassword"));
+                loginLocked(u.get("username").toString(),password(request,"currentPassword"));
                 setPassword(u,password(request,"newPassword"));
             } else if(Set.of("setUserActive","revokeSessions").contains(action)) {
                 require(owner(u)); var target=user(string(request,"userId"));
@@ -475,6 +478,7 @@ public final class PlatformService {
             for(var s:list(state,"sites")) list(s,"tickets").removeIf(t->!t.get("status").equals("ACTIVE")&&t.get("exitTime").toString().compareTo(cutoff)<0);
             list(state,"audit").add(new LinkedHashMap<>(Map.of("id",id(),"tenantId",tenant,"siteId",siteId,"actor",u.get("username"),"action",action,"at",now())));
             if(list(state,"audit").size()>5000) list(state,"audit").remove(0);
+            if(!Set.of("createPresentation","resetPresentation","sampleTime","createSampleWorkspace").contains(action)) PlatformAnalytics.record(state,u,siteId,"actions");
             state.put("revision",((Number)state.get("revision")).intValue()+1); persist();
             var result=new LinkedHashMap<>(view(userId)); if(deviceSecret!=null) result.put("deviceSecret",deviceSecret); if(operationResult!=null)result.put("operationResult",operationResult); return result;
         } catch(Exception ex) { state=map(Json.parse(before)); throw ex; }
