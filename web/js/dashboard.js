@@ -155,7 +155,7 @@ const money=v=>Number(v||0).toLocaleString('th-TH',{style:'currency',currency:'T
 const day=v=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(v));
 const tenant=new URLSearchParams(location.search).get('tenant')||'';
 const types={CAR:'รถยนต์ทั่วไป',ELECTRIC_VEHICLE:'รถยนต์ไฟฟ้า (EV)',MOTORCYCLE:'มอเตอร์ไซค์',TRUCK:'รถขนาดใหญ่'};
-let state,siteId='',tab='lot-view',busy=false,preferred='',heat=false,quote=null,receipt=null,loadedAt=Date.now(),noticeTimer;
+let state,siteId=new URLSearchParams(location.search).get('site')||'',tab='lot-view',busy=false,preferred='',heat=false,quote=null,receipt=null,loadedAt=Date.now(),noticeTimer;
 const site=()=>state?.sites.find(s=>s.id===siteId), active=()=>site()?.tickets.filter(t=>t.status==='ACTIVE')||[];
 const cells=()=>site()?.published.filter(c=>c.type==='SLOT')||[];
 const clock=()=>Date.now()+(site()?.sample?Number(site().simulationMinutes||0)*60000:0);
@@ -174,7 +174,12 @@ function feeView(t){const minutes=Math.max(0,Math.floor((Date.parse(t.quotedAt)-
 function render(){if(!state)return;const s=site(),all=cells(),taken=new Map(active().map(t=>[t.slotId,t]));
 $('account').textContent=`${state.tenants[0]?.name||''} · ${state.user.username} (${{super_admin:'เจ้าของแพลตฟอร์ม',owner:'เจ้าของบริษัท',admin:'ผู้ดูแล',staff:'พนักงาน'}[state.user.role]})`;
 $('companyContext').textContent=state.tenants[0]?.name||'';$('sitePicker').innerHTML=state.sites.length?state.sites.map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join(''):'<option>ยังไม่มีลานจอด</option>';$('sitePicker').value=siteId;
-$('liveMode').textContent=s?.sample?'พื้นที่ตัวอย่าง · ข้อมูลสมมุติ':'ข้อมูลบริษัทบนเซิร์ฟเวอร์';
+$('liveMode').textContent=s?.sample?'DEMO STUDIO · ข้อมูลสมมุติ':'ข้อมูลบริษัทบนเซิร์ฟเวอร์';
+const owns=['owner','super_admin'].includes(state.user.role);
+$('startPresentation').hidden=!owns;$('resetPresentation').hidden=!owns||!s?.presentation;
+$('presentationGuide').hidden=!owns||!s?.presentation;
+$('simulatePayment').hidden=!s?.sample;
+$('paymentConfirmationLabel').textContent=s?.sample?'ยืนยันรายการจำลอง ไม่ได้รับเงินจริง':'ตรวจสอบแล้วว่าได้รับชำระเงินจริง หรือยอดเป็นศูนย์';
 document.querySelectorAll('a[href^="platform.html"]').forEach(a=>a.href=tenant?`platform.html?tenant=${encodeURIComponent(tenant)}`:'platform.html');
 $('headerAvailCount').textContent=all.length-taken.size;$('headerOccCount').textContent=taken.size;
 $('headerRevenueText').textContent=money((s?.tickets||[]).filter(t=>t.paidAt||t.status==='EXITED').reduce((n,t)=>n+Number(t.fee||0),0));
@@ -206,7 +211,7 @@ function requestAiRecommendation(){const type=document.querySelector('[name=vTyp
 function ticketDisplay(t){return {...t,vehicleTypeDisplay:types[t.vehicleType],entryTime:fmt(t.entryTime),pricingStrategy:'PricingPolicy',rateDescription:rateText(t),memberVerified:!!t.memberRoom,memberName:t.memberRoom?'ห้อง '+t.memberRoom:''};}
 async function handleCheckIn(e){e.preventDefault();await guarded(async()=>{const plate=$('licensePlate').value.trim(),type=document.querySelector('[name=vType]:checked').value,c=recommendation(type,$('requiresCharging').checked,plate);if(!c)throw Error('ไม่มีช่องว่างที่รองรับรถ');await command('checkin',{plate,vehicleType:type,slotId:c.id,requiresCharging:type==='ELECTRIC_VEHICLE'&&$('requiresCharging').checked});const t=active().find(t=>t.licensePlate===plate);preferred='';showTicketModal(ticketDisplay(t));animateGate('entry');$('licensePlate').value='';});}
 async function searchTicketForExit(){await guarded(async()=>{quote=await api('quote',{siteId,query:$('exitSearchQuery').value.trim()});appState.currentFeePreview=feeView(quote);renderFeePreview(appState.currentFeePreview);$('paymentConfirmed').checked=false;receipt=null;if(quote.paidAt){receipt=quote;showLiveReceipt(quote);}selectPayMethod(appState.selectedPayMethod);});}
-function showLiveReceipt(t){showReceiptModal({paymentId:t.paymentId,transactionRef:t.paymentReference||'รับชำระโดยเจ้าหน้าที่',ticketId:t.ticketId,licensePlate:t.licensePlate,amount:Number(t.fee),methodLabel:t.paymentMethod,paymentTime:fmt(t.paidAt),cashTendered:t.paymentMethod==='MANUAL_CASH'?Number(t.cashTendered??t.fee):null,change:Number(t.change||0)});}
+function showLiveReceipt(t){showReceiptModal({paymentId:t.paymentId,transactionRef:t.paymentReference||'รับชำระโดยเจ้าหน้าที่',ticketId:t.ticketId,licensePlate:t.licensePlate,amount:Number(t.fee),methodLabel:t.paymentMethod,paymentTime:fmt(t.paidAt),cashTendered:['MANUAL_CASH','SIMULATED_CASH'].includes(t.paymentMethod)?Number(t.cashTendered??t.fee):null,change:Number(t.change||0)});}
 async function submitPayment(){await guarded(async()=>{if(!quote)throw Error('ค้นหาตั๋วก่อน');if(!$('paymentConfirmed').checked)throw Error('กรุณายืนยันว่ารับชำระเงินจริงแล้ว');receipt=await command('recordPayment',{ticketId:quote.ticketId,expectedFee:Number(quote.fee),method:appState.selectedPayMethod,cashTendered:Number($('cashTenderedInput').value),reference:$('paymentReference').value.trim(),confirmed:true});showLiveReceipt(receipt);});}
 async function finishPaymentAndOpenExitGate(){await guarded(async()=>{if(!receipt?.paidAt)throw Error('ยังไม่มีรายการรับชำระ');await command('checkout',{ticketId:receipt.ticketId});closeModal('receiptModalOverlay');$('feeResultCard').style.display='none';quote=null;receipt=null;appState.currentFeePreview=null;animateGate('exit');notice('บันทึกรถออกแล้ว');});}
 async function handleLostTicket(){if(!confirm('แจ้งตั๋วหายและเพิ่มค่าปรับ 300 บาท?'))return;await guarded(async()=>{await command('reportLostTicket',{query:$('exitSearchQuery').value.trim()});quote=await api('quote',{siteId,query:$('exitSearchQuery').value.trim()});appState.currentFeePreview=feeView(quote);renderFeePreview(appState.currentFeePreview);});}
@@ -227,6 +232,10 @@ loadSystemStatus:()=>guarded(refresh),loadParkingLotData:()=>guarded(refresh),lo
 loadParkingHistory:()=>guarded(async()=>{if($('historyFrom').value&&$('historyTo').value&&$('historyFrom').value>$('historyTo').value)throw Error('วันที่เริ่มต้องไม่เกินวันที่สิ้นสุด');await refresh();}),
 fastForward:minutes=>guarded(()=>command('sampleTime',{minutes})),resetSimTime:()=>guarded(()=>command('sampleTime',{minutes:0,reset:true})),
 toggleFloatingCopilot:()=>{if(can('ai-ops'))$('floatingCopilotWindow').classList.toggle('active');},sendQuickCopilotPrompt:q=>chat('aiCopilotChatLog',q),sendFloatingPrompt:q=>chat('floatingChatLog',q),submitCopilotChat:()=>{const q=$('copilotInputText').value;$('copilotInputText').value='';chat('aiCopilotChatLog',q);},submitFloatingCopilotChat:()=>{const q=$('floatingCopilotInput').value;$('floatingCopilotInput').value='';chat('floatingChatLog',q);},handleCopilotKeyPress:e=>{if(e.key==='Enter'){e.preventDefault();window.submitCopilotChat();}},handleFloatingCopilotKeyPress:e=>{if(e.key==='Enter'){e.preventDefault();window.submitFloatingCopilotChat();}}});
+$('startPresentation').onclick=()=>guarded(async()=>{const result=await command('createPresentation',{tenantId:state.tenants[0]?.id});siteId=result.siteId;resetContext();render();notice('ลานพรีเซนต์พร้อมแล้ว · เริ่มจากเมนูรับรถเข้า');});
+$('resetPresentation').onclick=()=>{if(confirm('เริ่มสาธิตใหม่? ลบรถและรายการทดลองในลานพรีเซนต์นี้ พร้อมคืนผังและประวัติตัวอย่าง ลานอื่นไม่เปลี่ยนแปลง'))guarded(async()=>{await command('resetPresentation',{confirmed:true});resetContext();render();notice('พร้อมเริ่มสาธิตรอบใหม่');});};
+$('simulatePayment').onclick=()=>{if(!site()?.sample||!quote)return;selectPayMethod(appState.selectedPayMethod);$('cashTenderedInput').value=quote.fee;$('paymentReference').value='DEMO-'+Date.now();$('paymentConfirmed').checked=true;submitPayment();};
+document.querySelectorAll('[data-demo-tab]').forEach(b=>b.onclick=()=>switchTab(b.dataset.demoTab));
 $('loginForm').onsubmit=e=>{e.preventDefault();guarded(async()=>{await api('login',Object.fromEntries(new FormData(e.target)));e.target.reset();resetContext();await refresh();});};
 $('logout').onclick=()=>guarded(async()=>{await api('logout',{});resetContext();showLogin();});
 $('sitePicker').onchange=e=>{siteId=e.target.value;resetContext();render();};

@@ -67,6 +67,8 @@
     }
     function sampleLayout(type) {
         const cells=template(type==='CUSTOM'?'PUBLIC':type);
+        cells.find(c=>c.id==='A20').slotType='LARGE';
+        cells.find(c=>c.id==='B20').slotType='VIP';
         for(const [id,cellType,label] of [['R1','BARRIER','ไม้กั้นเข้า'],['R3','CROSSING','ทางม้าลาย'],['R22','BARRIER','ไม้กั้นออก']]) {
             const cell=cells.find(c=>c.id===id);cell.type=cellType;cell.label=label;
         }
