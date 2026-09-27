@@ -14,6 +14,15 @@
     };
     const types = {SELECT:'เลือก / ย้าย', ROAD:'ถนน', ENTRY:'ทางเข้า', EXIT:'ทางออก', SLOT:'ช่องจอด', CROSSING:'ทางม้าลาย', BUILDING:'อาคาร / สิ่งกีดขวาง', CAMERA:'กล้อง', BARRIER:'ไม้กั้น', SENSOR:'เซนเซอร์', ERASE:'ลบ'};
     const slotTypes = {STANDARD:'รถยนต์', EV_CHARGING:'EV', MOTORCYCLE:'มอเตอร์ไซค์', VIP:'VIP', ACCESSIBLE:'ผู้พิการ', LARGE:'รถใหญ่'};
+    // randomUUID requires HTTPS; getRandomValues also works on HTTP EC2 hosts.
+    function createId() {
+        if (typeof root.crypto.randomUUID === 'function') return root.crypto.randomUUID();
+        const bytes = root.crypto.getRandomValues(new Uint8Array(16));
+        bytes[6] = (bytes[6] & 15) | 64;
+        bytes[8] = (bytes[8] & 63) | 128;
+        const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+        return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+    }
     const clone = value => JSON.parse(JSON.stringify(value));
     const near = (a,b) => a.floor === b.floor && Math.abs(a.x-b.x)+Math.abs(a.y-b.y)===1;
     const road = c => ['ROAD','ENTRY','EXIT','CROSSING','BARRIER'].includes(c.type);
@@ -82,6 +91,6 @@
         if(slot==='EV_CHARGING') return vehicle==='ELECTRIC_VEHICLE';
         return ['CAR','ELECTRIC_VEHICLE'].includes(vehicle);
     }
-    root.PlatformCore={templates,types,slotTypes,clone,route,validate,template,sampleLayout,preview,compatible};
+    root.PlatformCore={templates,types,slotTypes,createId,clone,route,validate,template,sampleLayout,preview,compatible};
     if(typeof module!=='undefined') module.exports=root.PlatformCore;
 })(typeof window==='undefined'?globalThis:window);

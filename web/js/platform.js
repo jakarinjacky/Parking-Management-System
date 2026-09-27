@@ -145,7 +145,7 @@
         if(type==='SELECT') { selected=existing?.id||''; render(); return; }
         if(type==='ERASE') { if(existing) mutate(()=>{draft=draft.filter(c=>c.id!==existing.id);selected='';}); return; }
         if(existing) return notice('ตำแหน่งนี้มีชิ้นส่วนแล้ว กรุณาย้ายหรือลบก่อน',true);
-        mutate(()=>{const id=crypto.randomUUID();draft.push({id,type,x,y,floor,label:type==='SLOT'?`F${floor}-${x+1}-${y+1}`:C.types[type],slotType:'STANDARD',rotation:0,oneWay:false});selected=id;});
+        mutate(()=>{const id=C.createId();draft.push({id,type,x,y,floor,label:type==='SLOT'?`F${floor}-${x+1}-${y+1}`:C.types[type],slotType:'STANDARD',rotation:0,oneWay:false});selected=id;});
     }
     function fee(t) {
         if(t.paidAt)return Number(t.fee||0);

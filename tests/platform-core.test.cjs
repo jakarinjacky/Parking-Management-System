@@ -30,3 +30,11 @@ assert(sample.some(c=>c.floor===2&&c.type==='ENTRY'));
 assert(C.route(sample,'F2A2').length>1);
 assert.equal(C.validate(C.sampleLayout('CUSTOM')).length,0);
 console.log('Platform domain JS: templates, paths, one-way, overlap, floors PASS');
+
+// Execute with only getRandomValues, as on the deployed HTTP origin.
+const vm=require('node:vm');
+const context={crypto:{getRandomValues:array=>require('node:crypto').webcrypto.getRandomValues(array)}};
+vm.runInNewContext(require('node:fs').readFileSync(require.resolve('../web/js/platform-core.js'),'utf8'),context);
+const ids=Array.from({length:1000},()=>context.PlatformCore.createId());
+assert.equal(new Set(ids).size,1000);
+assert(ids.every(id=>/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)));
