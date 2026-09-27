@@ -27,6 +27,8 @@ jobs:
           javac -encoding UTF-8 -d bin @sources.txt
           java -cp bin test.ParkingSystemTest
           java -cp bin test.PlatformRecoveryTest
+          java -cp bin test.PlatformSupportTest
+          java -cp bin test.PlatformTenantLifecycleTest
           java -cp bin test.PlatformAnalyticsTest
           java -cp bin test.PlatformBusinessTest
           node tests/platform-core.test.cjs
