@@ -192,7 +192,7 @@ with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
         assert len(owner.state['sites'])==4
         assert 'ChangedPassword123!' not in json.dumps(owner.state)
         owner.command('createSampleWorkspace', expected=403)
-        superuser.request('state')
+        superuser=Client(); superuser.login('superadmin')
         before_tenants=len(superuser.state['tenants'])
         superuser.command('createSampleWorkspace')
         examples=[s for s in superuser.state['sites'] if s.get('sample')]
