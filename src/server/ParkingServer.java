@@ -1201,8 +1201,15 @@ public class ParkingServer {
             String path = exchange.getRequestURI().getPath();
             if (platformOnly && (path == null || path.equals("/") || path.isEmpty()
                     || path.equals("/index.html") || path.equals("/login.html"))) {
-                exchange.getResponseHeaders().set("Location", "/platform.html");
+                exchange.getResponseHeaders().set("Location", "/dashboard.html");
                 exchange.sendResponseHeaders(302, -1);
+                return;
+            }
+            // The legacy classroom demo has its own ephemeral ledger and must never
+            // be presented as the live tenant workspace on the production server.
+            if (platformOnly && (path.equals("/demo.html") || path.equals("/js/app.js")
+                    || path.equals("/js/demo-runtime.js"))) {
+                exchange.sendResponseHeaders(404, -1);
                 return;
             }
             if (path == null || path.equals("/") || path.isEmpty()) {
@@ -1226,7 +1233,8 @@ public class ParkingServer {
             // ตรวจสอบความปลอดภัย ป้องกัน Path Traversal Attack
             Path file = webRoot.resolve(path.substring(1)).normalize();
             if (!file.startsWith(webRoot) || !Files.exists(file) || Files.isDirectory(file)) {
-                file = webRoot.resolve("index.html");
+                exchange.sendResponseHeaders(404, -1);
+                return;
             }
 
             // หากไม่พบไฟล์ ส่งรหัส 404 Not Found

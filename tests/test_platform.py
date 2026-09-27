@@ -44,7 +44,8 @@ class Client:
         return self.request('command', {'action': action, 'revision': self.state['revision'], **kwargs}, expected)
 
 with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
-    env = dict(os.environ, PLATFORM_DEMO='true', PLATFORM_DEVICE_GATEWAY='true', PLATFORM_DATA_DIR=str(Path(temporary) / 'platform'))
+    (Path(temporary) / 'web').symlink_to(ROOT / 'web', target_is_directory=True)
+    env = dict(os.environ, PLATFORM_DEMO='true', PLATFORM_ONLY='true', PLATFORM_DEVICE_GATEWAY='true', PLATFORM_DATA_DIR=str(Path(temporary) / 'platform'))
     def start():
         process = subprocess.Popen(['java', '-cp', CLASSES, 'server.ParkingServer'], cwd=temporary, env=env,
                                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -60,6 +61,16 @@ with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
         raise AssertionError('Server failed to start')
     process = start()
     try:
+        with urllib.request.urlopen('http://localhost:8080/') as page:
+            assert page.url.endswith('/dashboard.html')
+            assert b'js/dashboard.js' in page.read()
+        with urllib.request.urlopen('http://localhost:8080/platform.html') as page:
+            assert b'js/platform.js' in page.read()
+        try:
+            urllib.request.urlopen('http://localhost:8080/js/app.js')
+            raise AssertionError('Legacy demo API client exposed in production')
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 404
         owner, other, admin, staff, superuser = [Client() for _ in range(5)]
         owner.login('owner'); other.login('owner2'); admin.login('admin'); staff.login('staff'); superuser.login('superadmin')
         assert len(owner.state['sites']) == 3

@@ -6,6 +6,8 @@
 
 แพลตฟอร์มสามารถรันด้วย PostgreSQL และ Docker บน AWS EC2 ได้ ดูขั้นตอนภาษาไทยที่ [docs/AWS_FREE_TIER_DEPLOY_TH.md](docs/AWS_FREE_TIER_DEPLOY_TH.md) โดย workflow `.github/workflows/deploy-aws.yml` รองรับการ deploy ครั้งแรกแบบ manual และ deploy อัตโนมัติจาก `main` หลังตั้งค่า `AWS_DEPLOY_ENABLED=true`
 
+บนเซิร์ฟเวอร์ที่ตั้ง `PLATFORM_ONLY=true` หน้า `/` เปิด `dashboard.html` ซึ่งใช้ session และ `/api/platform` ชุดเดียวกับ `platform.html` โดยตรง เจ้าของ/ผู้ดูแลออกแบบและเผยแพร่ผังที่หน้าแพลตฟอร์ม พนักงานรับรถและออกรถจากแดชบอร์ด ข้อมูลช่องจอด ตั๋ว และประวัติอยู่ใน PostgreSQL ชุดเดียวกัน การออกรถเป็นการยืนยันรับเงินสดด้วยมือ การส่งออก Excel จำกัดตามสิทธิ์ข้อมูลที่ API ส่งให้ ส่วนหน้า `web/index.html` ที่เผยแพร่บน GitHub Pages ยังเป็นตัวอย่าง OOP แบบจำลองและไม่เชื่อมฐานข้อมูล AWS
+
 ---
 
 ## 🌟 จุดเด่นและสถาปัตยกรรม OOP (Key Highlights)
