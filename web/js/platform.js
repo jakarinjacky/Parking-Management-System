@@ -8,7 +8,7 @@
     const time=t=>t?new Date(t).toLocaleString('th-TH'):'—';
     const roles={super_admin:'เจ้าของแพลตฟอร์ม',owner:'เจ้าของบริษัท',admin:'ผู้ดูแล',staff:'พนักงาน'};
     let allState,tenantScope=new URLSearchParams(location.search).get('tenant')||'',state,siteId='',tab='sites',preview=false,busy=false,draft=[],dirty=false,tool='SELECT',floor=1,selected='',undo=[],redo=[],routeIds=[],noticeTimer,modalSubmit;
-    let analyticsDays='30',supportFilter='ALL';
+    let analyticsDays='30',supportFilter='ALL',billingFilter='ALL';
     let filters={from:'',to:'',plate:''};
     // Platform operators explicitly enter one customer's workspace. Customers are
     // already tenant-filtered by the API; this filter only scopes the operator UI.
@@ -43,8 +43,9 @@
     function loadDraft() { draft=C.clone(current()?.draft||[]); dirty=false; selected=''; undo=[]; redo=[]; routeIds=[]; }
     function showWorkspace() {
         $('loginScreen').hidden=true; $('workspace').hidden=false;
-        if(platformOwner()&&!tenantScope&&!['analytics','customers','support'].includes(tab)) tab='analytics';
+        if(platformOwner()&&!tenantScope&&!['analytics','customers','support','billing'].includes(tab)) tab='analytics';
         if(!platformOwner()&&['analytics','customers'].includes(tab)) tab='sites';
+        if(!owner()&&tab==='billing') tab='sites';
         if(!state.sites.some(s=>s.id===siteId)) siteId=state.sites[0]?.id||'';
         $('accountName').textContent=`${state.user.username} · ${roles[state.user.role]}`;
         $('modeBanner').textContent=preview?'ตัวอย่างอ่านอย่างเดียว • ไม่มีการบันทึกหรือควบคุมอุปกรณ์จริง':current()?.sample?'ลานตัวอย่าง · ทะเบียน ประวัติ และอุปกรณ์เป็นข้อมูลสมมุติ · แยกบริษัทจากข้อมูลจริง':'ข้อมูลจริงบนเซิร์ฟเวอร์ • อุปกรณ์รองรับ LED bench เมื่อเปิด Gateway';
@@ -55,8 +56,8 @@
         document.querySelectorAll('a[href^="dashboard.html"]').forEach(a=>a.href=platformOwner()&&tenantScope?`dashboard.html?tenant=${encodeURIComponent(tenantScope)}`:'dashboard.html');
         $('sitePicker').hidden=platformOwner()&&!tenantScope;
         $('sitePicker').innerHTML=state.sites.length?options(Object.fromEntries(state.sites.map(s=>[s.id,s.name])),siteId):'<option>ยังไม่มีลานจอด</option>';
-        const pages={support:'✉  แจ้งปัญหา / ติดต่อผู้ดูแล',...(platformOwner()?{analytics:'▥  Dashboard ลูกค้า',customers:'♙  ลูกค้าแพลตฟอร์ม'}:{}),sites:'▦  ลานจอดทั้งหมด',editor:'▧  ออกแบบผัง',operations:'↔  รถเข้า–ออก',history:'◷  ประวัติ / Excel',members:'◎  สมาชิก / การจอง',devices:'⌁  อุปกรณ์',settings:'⚙  ตั้งค่าลาน',users:'♙  ทีมงานของบริษัท',audit:'≡  บันทึกกิจกรรม'};
-        $('nav').innerHTML=Object.entries(pages).filter(([id])=>platformOwner()&&!tenantScope?['analytics','customers','support'].includes(id):owner()||!['editor','settings','users','audit'].includes(id)&& (manager()||!['history','members','devices'].includes(id))).map(([id,label])=>`<button data-nav="${id}" class="${id===tab?'active':''}">${label}</button>`).join('');
+        const pages={...(owner()?{billing:'฿  ค่าเช่าแพลตฟอร์ม'}:{}),support:'✉  แจ้งปัญหา / ติดต่อผู้ดูแล',...(platformOwner()?{analytics:'▥  Dashboard ลูกค้า',customers:'♙  ลูกค้าแพลตฟอร์ม'}:{}),sites:'▦  ลานจอดทั้งหมด',editor:'▧  ออกแบบผัง',operations:'↔  รถเข้า–ออก',history:'◷  ประวัติ / Excel',members:'◎  สมาชิก / การจอง',devices:'⌁  อุปกรณ์',settings:'⚙  ตั้งค่าลาน',users:'♙  ทีมงานของบริษัท',audit:'≡  บันทึกกิจกรรม'};
+        $('nav').innerHTML=Object.entries(pages).filter(([id])=>platformOwner()&&!tenantScope?['analytics','customers','support','billing'].includes(id):owner()||!['editor','settings','users','audit'].includes(id)&& (manager()||!['history','members','devices'].includes(id))).map(([id,label])=>`<button data-nav="${id}" class="${id===tab?'active':''}">${label}</button>`).join('');
         render();
     }
     function heading(title,subtitle,actions='') { return `<div class="page-title"><div><span class="eyebrow">GREENPARK / ${escape(tab.toUpperCase())}</span><h1>${title}</h1><p>${subtitle}</p></div><div class="actions">${actions}</div></div>`; }
@@ -64,6 +65,22 @@
     function empty(text) { return `<div class="empty">${text}</div>`; }
     function metric(label,value) { return `<div class="metric"><span>${label}</span><strong>${value}</strong></div>`; }
     function table(headers,rows) { return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`; }
+    const billingPlans={STARTER:'Starter · 499 บาท/เดือน',BUSINESS:'Business · 990 บาท/เดือน',MULTI_SITE:'Multi-site · 1,990 บาท/เดือน'};
+    const billStatuses={ISSUED:'รอชำระ',REPORTED:'แจ้งโอน / รอตรวจสอบ',PAID:'รับเงินแล้ว',VOID:'ยกเลิก'};
+    function billingDashboard() {
+        const b=allState.platformBilling;
+        if(!b)return heading('ค่าเช่าแพลตฟอร์ม','เฉพาะเจ้าของบริษัทและเจ้าของแพลตฟอร์ม')+empty('กรุณารีเฟรชเพื่อโหลดข้อมูลบิล');
+        const invoices=b.invoices.filter(i=>!platformOwner()||!tenantScope||i.tenantId===tenantScope), outstanding=invoices.filter(i=>['ISSUED','REPORTED'].includes(i.status)),paid=invoices.filter(i=>i.status==='PAID');
+        const overdue=i=>['ISSUED','REPORTED'].includes(i.status)&&i.dueDate<b.today;
+        const sum=rows=>money(rows.reduce((n,i)=>n+i.amount,0));
+        let html=heading('ค่าเช่าแพลตฟอร์ม','บิลรายเดือนและประวัติรับเงินค่าใช้บริการ GreenPark',platformOwner()?button('billingSettings','ตั้งค่ารับโอน',false,writeDisabled())+button('issueInvoice','＋ ออกบิลรายเดือน',true,writeDisabled()):'');
+        html+=`<div class="metrics">${metric(platformOwner()?'รับเงินแล้วสะสม':'ชำระแล้วสะสม',sum(paid))}${metric('ยอดรอชำระ / รอตรวจสอบ',sum(outstanding))}${metric('เกินกำหนดชำระ',sum(invoices.filter(overdue)))}${metric('บิลแจ้งโอนรอตรวจ',invoices.filter(i=>i.status==='REPORTED').length)}</div>`;
+        html+=`<section class="card"><h2>ช่องทางชำระเงิน</h2><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escape(b.paymentInstructions||'ยังไม่ได้ตั้งค่าบัญชีรับโอน กรุณาติดต่อเจ้าของแพลตฟอร์ม')}</p><p>โอนตามยอดในบิล แล้วแจ้งเลขอ้างอิง ผู้ดูแลตรวจยอดเงินเข้าก่อนยืนยันรับเงิน</p><label>สถานะบิล<select id="billingFilter">${options({ALL:'ทั้งหมด',OVERDUE:'เกินกำหนด',...billStatuses},billingFilter)}</select></label></section>`;
+        const shown=invoices.filter(i=>billingFilter==='ALL'||(billingFilter==='OVERDUE'?overdue(i):i.status===billingFilter)).slice().sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+        html+=shown.length?shown.map(i=>`<article class="card section-gap"><div class="card-top"><span class="tag">${billStatuses[i.status]}${overdue(i)?' · เกินกำหนด':''}</span><strong>${escape(i.number)}</strong></div><h2>${money(i.amount)}</h2><p>${escape(i.tenantName)} · ${escape(billingPlans[i.plan])}</p><p>รอบบริการ ${i.periodStart} ถึง ${new Date(Date.parse(i.periodEnd+'T00:00:00Z')-86400000).toISOString().slice(0,10)} · ครบกำหนด ${i.dueDate}</p><details><summary>รายละเอียดบิล / ประวัติรับเงิน</summary><p style="white-space:pre-wrap;overflow-wrap:anywhere">ข้อมูลรับโอน ณ วันออกบิล: ${escape(i.paymentInstructions)}</p><p>แจ้งโอน: ${escape(i.transferReference||'—')} · ${time(i.reportedAt)}</p><p>รับเงิน: ${escape(i.paymentReference||'—')} · ${time(i.paidAt)}</p>${i.voidReason?`<p>เหตุผลยกเลิก: ${escape(i.voidReason)}</p>`:''}<p>เอกสารเรียกเก็บภายในระบบ ไม่ใช่ใบกำกับภาษี</p></details><div class="actions">${['ISSUED','REPORTED'].includes(i.status)?platformOwner()?button('confirmInvoice','ตรวจแล้ว / ยืนยันรับเงิน',true,writeDisabled(),`data-id="${escape(i.id)}"`)+button('voidInvoice','ยกเลิกบิล',false,writeDisabled(),`data-id="${escape(i.id)}"`):button('reportTransfer',i.status==='REPORTED'?'แก้ไขข้อมูลแจ้งโอน':'แจ้งโอนเงิน',true,writeDisabled(),`data-id="${escape(i.id)}"`):''}</div></article>`).join(''):empty('ยังไม่มีบิลในสถานะนี้');
+        html+=`<section class="card section-gap"><h3>ขอบเขตระบบเรียกเก็บรุ่นแรก</h3><p>ออกบิลครั้งละ 1 เดือนโดยผู้ดูแล ไม่ตัดเงินหรือออกบิลซ้ำอัตโนมัติ ไม่ระงับลานจอดอัตโนมัติเมื่อค้างชำระ และยังไม่บังคับโควตาลานหรือบัญชีตามแพ็กเกจ ยอดนี้แยกจากค่าจอดรถของบริษัทลูกค้า</p></section>`;
+        return html;
+    }
     const supportStatuses={OPEN:'รอรับเรื่อง',IN_PROGRESS:'กำลังดำเนินการ',RESOLVED:'แก้ไขแล้ว'};
     function supportDashboard() {
         const issues=allState.supportTickets||[],visible=issues.filter(t=>(!platformOwner()||!tenantScope||t.tenantId===tenantScope)&&(supportFilter==='ALL'||t.status===supportFilter)).slice().sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
@@ -85,11 +102,13 @@
     }
     function render() {
         let content=''; const s=current();
-        if(tab!=='support'&&tab!=='analytics'&&tab!=='customers'&&tab!=='sites'&&tab!=='users'&&tab!=='audit'&&!s) {
+        if(tab!=='billing'&&tab!=='support'&&tab!=='analytics'&&tab!=='customers'&&tab!=='sites'&&tab!=='users'&&tab!=='audit'&&!s) {
             $('main').innerHTML=heading('ยังไม่มีลานจอด','สร้างลานก่อนใช้เครื่องมือออกแบบและรับรถ')+`<div class="card onboarding"><h2>เริ่มออกแบบลานจอด</h2><p>ลานตัวอย่างมีถนน 2 ชั้น ช่องจอด กล้องและไม้กั้นจำลอง พร้อมประวัติรถ 3 เดือน ข้อมูลทั้งหมดระบุว่าเป็นตัวอย่างและอยู่ในบริษัททดลองแยกต่างหาก</p><div class="actions">${state.user.role==='super_admin'&&!allState.tenants.some(t=>t.sample)?button('sampleWorkspace','＋ สร้างพื้นที่ทดลอง',true,writeDisabled()):''}${state.user.role==='super_admin'?button('tenant','สร้างบริษัทจริง',false,writeDisabled()):''}${owner()&&state.tenants.length?button('createSite','สร้างลานจอดจริง',false,writeDisabled()):''}</div></div>`;
             return;
         }
-        if(tab==='support') {
+        if(tab==='billing'&&owner()) {
+            content=billingDashboard();
+        } else if(tab==='support') {
             content=supportDashboard();
         } else if(tab==='analytics'&&platformOwner()) {
             content=analyticsDashboard();
@@ -150,6 +169,7 @@
             content+=`<section class="card section-gap"><h3>แบบร่างถนนโค้ง • ชั้น ${floor}</h3><p>พื้นที่ 100 × 100 เมตร เป็นแบบร่างแยกจาก Grid ที่ใช้รับรถ ยังไม่ตรวจรัศมีเลี้ยวหรือเชื่อมเส้นทางอัตโนมัติ</p>${button('roadCurve','เพิ่มถนนโค้ง',false,writeDisabled())}<svg viewBox="-6 -6 112 112" role="img" aria-label="แบบร่างถนนโค้ง" style="width:100%;max-width:540px;background:#263b35">${curves.map(c=>`<path d="M ${c.x1} ${c.y1} Q ${c.cx} ${c.cy} ${c.x2} ${c.y2}" fill="none" stroke="#8ca69e" stroke-width="${c.width}"/><path d="M ${c.x1} ${c.y1} Q ${c.cx} ${c.cy} ${c.x2} ${c.y2}" fill="none" stroke="white" stroke-width="0.3" stroke-dasharray="2 2"/>`).join('')}</svg>${table(['ชื่อ','กว้าง (ม.)',''],curves.map(c=>[escape(c.label),c.width,button('removeCurve','ลบ',false,writeDisabled(),`data-id="${escape(c.id)}"`)]))}</section>`;
         }
         $('main').innerHTML=content;
+        $('billingFilter')?.addEventListener('change',e=>{billingFilter=e.target.value;render();});
         $('supportFilter')?.addEventListener('change',e=>{supportFilter=e.target.value;render();});
         $('analyticsDays')?.addEventListener('change',e=>{analyticsDays=e.target.value;render();});
         if(tab==='settings') $('settingsForm').onsubmit=async e=>{e.preventDefault(); const f=new FormData(e.target); await safely(async()=>{await command('configure',{name:f.get('name'),address:f.get('address'),rate:Number(f.get('rate')),freeMinutes:Number(f.get('freeMinutes')),active:f.has('active'),features:{membership:f.has('membership'),reservation:f.has('reservation')}}); showWorkspace(); notice('บันทึกการตั้งค่าแล้ว');});};
@@ -241,6 +261,18 @@
         }
         if(name==='openSite'||name==='editSite') { if(!checkDirty())return; siteId=element.dataset.id; tab=name==='editSite'?'editor':'operations';loadDraft();showWorkspace(); }
         if(name==='createSite') modal('สร้างลานจอด',field('name','ชื่อลาน')+(state.user.role==='super_admin'?select('tenantId','บริษัท',Object.fromEntries(state.tenants.map(t=>[t.id,t.name]))):'')+select('businessType','แม่แบบ',Object.fromEntries(Object.entries(C.templates).map(([k,v])=>[k,`${v[0]} — ${v[1]}`])))+'<p class="help">แม่แบบเป็นจุดเริ่มต้น ไม่ล็อกการแก้ไข แม่แบบใช้ผังเริ่มต้นร่วมกัน ปรับให้ตรงพื้นที่จริงก่อนเผยแพร่</p>',async f=>{const before=new Set(state.sites.map(s=>s.id));await command('createSite',Object.fromEntries(f));siteId=state.sites.find(s=>!before.has(s.id))?.id||siteId;tab='editor';loadDraft();});
+        if(name==='billingSettings') modal('ตั้งค่าช่องทางรับโอน',`<label>ธนาคาร / เลขบัญชี / ชื่อบัญชี หรือข้อมูลพร้อมเพย์<textarea name="paymentInstructions" required maxlength="2000" rows="5">${escape(allState.platformBilling.paymentInstructions)}</textarea></label><p>ข้อมูลนี้จะแสดงให้เจ้าของบริษัทลูกค้าเห็น บิลที่ออกแล้วเก็บข้อมูลรับโอนเดิมไว้</p>`,f=>command('configureBilling',Object.fromEntries(f)));
+        if(name==='issueInvoice') {
+            const companies=allState.tenants.filter(t=>!t.sample);
+            if(!companies.length){notice('เพิ่มบริษัทลูกค้าจริงก่อนออกบิล',true);return;}
+            modal('ออกบิลค่าแพลตฟอร์ม 1 เดือน',select('tenantId','บริษัท',Object.fromEntries(companies.map(t=>[t.id,t.name])),tenantScope)+select('plan','แพ็กเกจ',billingPlans,'STARTER')+field('periodStart','วันเริ่มรอบบริการ','date',allState.platformBilling.today)+field('dueDate','วันครบกำหนดชำระ','date',allState.platformBilling.today)+'<p>ราคาคำนวณจากแพ็กเกจที่เซิร์ฟเวอร์ ไม่รวมฮาร์ดแวร์และงานติดตั้ง บิลที่มีรอบทับซ้อนจะถูกปฏิเสธ</p>',f=>command('issuePlatformInvoice',Object.fromEntries(f)));
+        }
+        if(name==='reportTransfer') modal('แจ้งโอนค่าแพลตฟอร์ม',field('reference','เลขอ้างอิงธุรกรรม / วันเวลาโอน')+'<p>การแจ้งโอนยังไม่ถือว่าชำระสำเร็จ ต้องรอเจ้าของแพลตฟอร์มตรวจยอด</p>',f=>command('reportPlatformTransfer',{invoiceId:element.dataset.id,reference:f.get('reference')}));
+        if(name==='confirmInvoice') {
+            const invoice=allState.platformBilling.invoices.find(i=>i.id===element.dataset.id);
+            modal('ยืนยันรับเงินจริง',`<p>${escape(invoice.number)} · ${escape(invoice.tenantName)} · ${money(invoice.amount)}</p>`+field('reference','เลขอ้างอิงจากรายการเงินเข้าบัญชี')+'<label class="check-label"><input name="confirmed" type="checkbox" required>ตรวจแล้วว่าเงินเข้าบัญชีครบตามยอดบิล</label>',f=>command('confirmPlatformPayment',{invoiceId:invoice.id,reference:f.get('reference'),confirmed:f.has('confirmed')}));
+        }
+        if(name==='voidInvoice') modal('ยกเลิกบิลที่ยังไม่รับเงิน',field('reason','เหตุผลยกเลิก'),f=>command('voidPlatformInvoice',{invoiceId:element.dataset.id,reason:f.get('reason')}));
         if(name==='createSupport') modal('แจ้งปัญหาที่พบ',field('subject','หัวข้อปัญหา')+'<label>รายละเอียด / ขั้นตอนที่ทำให้เกิดปัญหา<textarea name="message" required maxlength="4000" rows="6"></textarea></label>',f=>command('createSupportTicket',Object.fromEntries(f)));
         if(name==='replySupport') modal('ตอบกลับรายการแจ้งปัญหา','<label>ข้อความ<textarea name="message" required maxlength="4000" rows="6"></textarea></label>',f=>command('replySupportTicket',{ticketId:element.dataset.id,message:f.get('message')}));
         if(name==='supportStatus') {

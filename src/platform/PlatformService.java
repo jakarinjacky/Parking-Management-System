@@ -42,7 +42,7 @@ public final class PlatformService {
     }
     private void initialize(boolean demo,String adminPassword) throws Exception {
         String saved=store.load();
-        if(saved!=null&&!saved.isBlank()) { state=map(Json.parse(saved)); PlatformAnalytics.initialize(state); state.putIfAbsent("supportTickets",new ArrayList<>()); persist(); return; }
+        if(saved!=null&&!saved.isBlank()) { state=map(Json.parse(saved)); PlatformAnalytics.initialize(state); state.putIfAbsent("supportTickets",new ArrayList<>()); PlatformBilling.initialize(state); persist(); return; }
         state=new LinkedHashMap<>(Map.of("revision",0,"tenants",new ArrayList<>(),"sites",new ArrayList<>(),"users",new ArrayList<>(),"audit",new ArrayList<>()));
         if(demo) {
             addTenant("DEMO-A","Green Park • บริษัทตัวอย่าง", "trial");
@@ -62,6 +62,7 @@ public final class PlatformService {
         } else { throw new IllegalArgumentException("Set PLATFORM_ADMIN_PASSWORD (12–128 characters) before first startup"); }
         PlatformAnalytics.initialize(state);
         state.put("supportTickets",new ArrayList<>());
+        PlatformBilling.initialize(state);
         persist();
     }
     @SuppressWarnings("unchecked") public static Map<String,Object> map(Object o) {
@@ -210,6 +211,7 @@ public final class PlatformService {
             "audit",owner(u)?list(state,"audit").stream().filter(a->superUser(u)||a.get("tenantId").equals(u.get("tenantId"))).toList():List.of(),
             "storage",store.description()));
         result.put("supportTickets",list(state,"supportTickets").stream().filter(t->superUser(u)||u.get("tenantId").equals(t.get("tenantId"))).toList());
+        if(owner(u)) result.put("platformBilling",PlatformBilling.view(state,u));
         if(superUser(u)) result.put("platformAnalytics",PlatformAnalytics.report(state));
         return result;
     }
@@ -317,6 +319,8 @@ public final class PlatformService {
                     for(Object sid:assigned) { var assignedSite=site(u,sid.toString()); require(assignedSite.get("tenantId").equals(tenant)); }
                     target.put("role",role); target.put("siteIds",new ArrayList<>(assigned)); revoke(target);
                 }
+            } else if(PlatformBilling.ACTIONS.contains(action)) {
+                tenant=PlatformBilling.execute(state,u,action,request);
             } else if(action.equals("createSupportTicket")) {
                 require(!superUser(u));
                 var issue=new LinkedHashMap<String,Object>();
@@ -346,6 +350,7 @@ public final class PlatformService {
                     target.put("active",request.get("active"));target.put("statusChangedAt",now());
                     for(var member:list(state,"users")) if(targetId.equals(member.get("tenantId"))) revoke(member);
                 } else {
+                    if(list(state,"platformInvoices").stream().anyMatch(i->targetId.equals(i.get("tenantId"))&&!"VOID".equals(i.get("status")))) throw new IllegalArgumentException("บริษัทมีบิลที่ยังไม่ยกเลิกหรือประวัติชำระเงิน กรุณาใช้การระงับเพื่อรักษาประวัติบัญชี");
                     if(!Boolean.FALSE.equals(target.get("active"))) throw new IllegalArgumentException("ระงับบริษัทก่อนลบข้อมูล");
                     if(!target.get("name").equals(string(request,"confirmationName"))) throw new IllegalArgumentException("ชื่อบริษัทยืนยันไม่ตรงกัน");
                     loginLocked(u.get("username").toString(),password(request,"currentPassword"));
