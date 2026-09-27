@@ -136,6 +136,26 @@ with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
         owner.command('checkin', expected=400, siteId=sid, slotId='A6', plate='OTHER', vehicleType='CAR')
         owner.command('addDevice', siteId=sid, name='Entry camera', type='CAMERA')
         owner.command('createUser', username='newstaff', password='LongPassword123!', role='staff', siteIds=[sid])
+        team_id=next(u['id'] for u in owner.state['users'] if u['username']=='newstaff')
+        employee=Client(); employee.request('login',{'username':'newstaff','password':'LongPassword123!'})
+        assert [s['id'] for s in employee.state['sites']]==[sid]
+        assert employee.state['users']==[]
+        employee.command('updateTeamUser',expected=403,userId=team_id,role='admin',siteIds=[sid])
+        other.command('resetTeamPassword',expected=403,userId=team_id,newPassword='ResetPassword123!')
+        owner.command('updateTeamUser',expected=403,userId=team_id,role='owner',siteIds=[sid])
+        owner.command('updateTeamUser',expected=403,userId=team_id,role='staff',siteIds=[foreign_site])
+        owner.command('updateTeamUser',expected=400,userId=team_id,role='staff',siteIds=[])
+        owner.command('updateTeamUser',userId=team_id,role='staff',siteIds=[custom['id']])
+        employee.request('state',expected=401)
+        employee.request('login',{'username':'newstaff','password':'LongPassword123!'})
+        assert [s['id'] for s in employee.state['sites']]==[custom['id']]
+        employee.command('checkin',expected=403,siteId=sid,plate='FORBIDDEN',slotId='A4',vehicleType='CAR')
+        owner.command('resetTeamPassword',userId=team_id,newPassword='ResetPassword123!')
+        employee.request('state',expected=401)
+        employee.request('login',{'username':'newstaff','password':'LongPassword123!'},expected=403)
+        employee.request('login',{'username':'newstaff','password':'ResetPassword123!'})
+        assert 'ResetPassword123!' not in json.dumps(owner.state)
+        assert owner.state['user']['role']=='owner'
         superuser.command('createTenant', name='New customer', username='customer', password='LongPassword123!')
         assert len(superuser.state['tenants']) == 3
         Client().request('command', {'action':'publish'}, expected=401)

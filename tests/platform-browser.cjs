@@ -25,6 +25,25 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await page.locator('#loginForm button').click();
   await page.locator('#workspace').waitFor({state:'visible'});
   await page.screenshot({animations:'disabled',path:path.join(tmp,'platform-desktop.png'),fullPage:true});
+  await page.locator('[data-nav=users]').click();
+  await page.locator('[data-action=user]').click();
+  await page.locator('#modal [name=username]').fill('browser.employee');
+  await page.locator('#modal [name=password]').fill('EmployeePass123!');
+  assert.equal(await page.locator('#modal [name=role]').inputValue(),'staff');
+  await page.locator('#modal [name=siteIds]').first().check();
+  await page.locator('#modal button[type=submit]').click();
+  await page.locator('#modal').waitFor({state:'hidden'});
+  const employeeRow=page.locator('tr').filter({hasText:'browser.employee'});
+  await employeeRow.locator('[data-action=editTeamUser]').click();
+  await page.locator('#modal [name=role]').selectOption('admin');
+  await page.locator('#modal button[type=submit]').click();
+  await page.locator('#modal').waitFor({state:'hidden'});
+  await employeeRow.locator('[data-action=resetTeamPassword]').click();
+  await page.locator('#modal [name=newPassword]').fill('NewEmployee123!');
+  await page.locator('#modal [name=confirmPassword]').fill('NewEmployee123!');
+  await page.locator('#modal button[type=submit]').click();
+  await page.locator('#modal').waitFor({state:'hidden'});
+  await page.locator('[data-nav=sites]').click();
   await page.locator('[data-action=editSite]').first().click();
   const placed=[];
   for (const [i,type] of ['ROAD','ENTRY','EXIT','SLOT','CROSSING','BUILDING','CAMERA','BARRIER','SENSOR'].entries()) {

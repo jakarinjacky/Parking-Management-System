@@ -274,6 +274,20 @@ public final class PlatformService {
                     target.put("active",request.get("active"));
                 }
                 revoke(target);
+            } else if(Set.of("updateTeamUser","resetTeamPassword").contains(action)) {
+                require(owner(u)); var target=user(string(request,"userId"));
+                require(!target.get("id").equals(userId));
+                require(Set.of("admin","staff").contains(target.get("role")));
+                require(superUser(u)||target.get("tenantId").equals(u.get("tenantId")));
+                tenant=target.get("tenantId").toString();
+                if(action.equals("resetTeamPassword")) setPassword(target,password(request,"newPassword"));
+                else {
+                    String role=string(request,"role"); require(Set.of("admin","staff").contains(role));
+                    Object raw=request.get("siteIds");
+                    if(!(raw instanceof List<?> assigned)||assigned.isEmpty()) throw new IllegalArgumentException("เลือกลานให้ผู้ใช้");
+                    for(Object sid:assigned) { var assignedSite=site(u,sid.toString()); require(assignedSite.get("tenantId").equals(tenant)); }
+                    target.put("role",role); target.put("siteIds",new ArrayList<>(assigned)); revoke(target);
+                }
             } else if(action.equals("createTenant")) {
                 require(superUser(u)); tenant=id(); addTenant(tenant,string(request,"name"),"trial");
                 addUser(string(request,"username"),string(request,"password"),"owner",tenant,List.of());
