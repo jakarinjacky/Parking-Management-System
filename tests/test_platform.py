@@ -158,6 +158,23 @@ with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
         assert owner.state['user']['role']=='owner'
         superuser.command('createTenant', name='New customer', username='customer', password='LongPassword123!')
         assert len(superuser.state['tenants']) == 3
+        presentation_owner=Client(); presentation_owner.request('login',{'username':'customer','password':'LongPassword123!'})
+        presentation_owner.command('createPresentation')
+        demo=next(s for s in presentation_owner.state['sites'] if s.get('presentation'))
+        demo_id=demo['id']
+        assert {'STANDARD','EV_CHARGING','MOTORCYCLE','VIP','ACCESSIBLE','LARGE'} <= {c['slotType'] for c in demo['published'] if c['type']=='SLOT'}
+        assert len(demo['tickets'])==30
+        presentation_owner.command('createPresentation')
+        assert len(presentation_owner.state['sites'])==1
+        staff.command('createPresentation',expected=403)
+        other.command('resetPresentation',expected=403,siteId=demo_id,confirmed=True)
+        owner.command('resetPresentation',expected=403,siteId=sid,confirmed=True)
+        presentation_owner.command('checkin',siteId=demo_id,plate='DEMO-TRUCK',vehicleType='TRUCK',slotId='A20')
+        presentation_owner.command('sampleTime',siteId=demo_id,minutes=60)
+        presentation_owner.command('resetPresentation',siteId=demo_id,confirmed=True)
+        reset=next(s for s in presentation_owner.state['sites'] if s['id']==demo_id)
+        assert reset['simulationMinutes']==0 and all(t['status']=='EXITED' for t in reset['tickets'])
+
         Client().request('command', {'action':'publish'}, expected=401)
         owner.request('command', {'action':'publish','siteId':sid,'revision':-1}, expected=400)
         owner.request('command', {'action':'publish','siteId':sid,'revision':0}, expected=409)
@@ -239,7 +256,7 @@ with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
         superuser=Client(); superuser.login('superadmin')
         before_tenants=len(superuser.state['tenants'])
         superuser.command('createSampleWorkspace')
-        examples=[s for s in superuser.state['sites'] if s.get('sample')]
+        examples=[s for s in superuser.state['sites'] if s.get('sample') and not s.get('presentation')]
         assert len(examples)==3
         assert len(superuser.state['tenants'])==before_tenants+1
         assert all(len(s['published'])>60 and len(s['versions'])==1 for s in examples)
@@ -269,7 +286,7 @@ with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
         superuser.command('recordPayment',expected=403,**payload)
         superuser.command('checkout',siteId=sample_id,ticketId=lost['ticketId'])
         paid=next(t for ss in superuser.state['sites'] if ss['id']==sample_id for t in ss['tickets'] if t['ticketId']==lost['ticketId'])
-        assert paid['fee']==lost['fee'] and paid['paymentMethod']=='MANUAL_CASH'
+        assert paid['fee']==lost['fee'] and paid['paymentMethod']=='SIMULATED_CASH'
         superuser.command('checkout',expected=400,siteId=sample_id,ticketId=lost['ticketId'])
         superuser.command('sampleTime',siteId=sample_id,minutes=0,reset=True)
         for method in ['PROMPTPAY','CREDIT_CARD']:
@@ -278,7 +295,7 @@ with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
             data=dict(siteId=sample_id,ticketId=q['ticketId'],method=method,expectedFee=q['fee'],confirmed=True)
             superuser.command('recordPayment',expected=400,**data,reference='')
             superuser.command('recordPayment',**data,reference='EXTERNAL-RECEIPT-'+method)
-            assert superuser.state['operationResult']['paymentMethod']=='MANUAL_'+method
+            assert superuser.state['operationResult']['paymentMethod']=='SIMULATED_'+method
             superuser.command('checkout',siteId=sample_id,ticketId=q['ticketId'])
         print('Platform HTTP PASS: tenant isolation, roles, layouts, publication guards, transactions, reservations, users, XLSX source data, restart persistence')
     finally:

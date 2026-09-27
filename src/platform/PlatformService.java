@@ -239,6 +239,15 @@ public final class PlatformService {
         site.put("features",new LinkedHashMap<>(Map.of("membership",true,"reservation",true)));
         list(state,"sites").add(site); return site;
     }
+    private void preparePresentation(Map<String,Object> site) {
+        site.put("sample",true); site.put("presentation",true); site.put("simulationMinutes",0);
+        site.put("active",true); site.put("rate",20); site.put("freeMinutes",15);
+        site.remove("policy"); site.remove("roadCurves");
+        site.put("features",new LinkedHashMap<>(Map.of("membership",true,"reservation",true)));
+        site.put("draft",ParkingLayout.sampleLayout("PUBLIC"));
+        for(String key:List.of("tickets","memberships","reservations","devices","versions"))site.put(key,new ArrayList<>());
+        seedHistory(site);
+    }
     private void seedHistory(Map<String,Object> site) {
         site.put("published",Json.parse(SimpleJson.toJson(site.get("draft"))));
         list(site,"versions").add(new LinkedHashMap<>(Map.of("id",id(),"at",now(),"cells",Json.parse(SimpleJson.toJson(site.get("draft"))))));
@@ -301,6 +310,13 @@ public final class PlatformService {
                     var example=createSite(tenant,spec[0],spec[1]); example.put("sample",true);
                     example.put("draft",ParkingLayout.sampleLayout(spec[1])); seedHistory(example);
                 }
+            } else if(action.equals("createPresentation")) {
+                require(owner(u)); if(superUser(u))tenant=string(request,"tenantId");
+                final String demoTenant=tenant;
+                require(list(state,"tenants").stream().anyMatch(t->t.get("id").equals(demoTenant)));
+                var demo=list(state,"sites").stream().filter(v->v.get("tenantId").equals(demoTenant)&&Boolean.TRUE.equals(v.get("presentation"))).findFirst().orElse(null);
+                if(demo==null) {demo=createSite(tenant,"GreenPark Studio • ลานพรีเซนต์","PUBLIC");preparePresentation(demo);}
+                siteId=demo.get("id").toString(); operationResult=Map.of("siteId",siteId);
             } else if(action.equals("createSite")) {
                 require(owner(u)); if(superUser(u)) tenant=string(request,"tenantId");
                 final String target=tenant;
@@ -318,6 +334,11 @@ public final class PlatformService {
                 if(Set.of("saveLayout","publish","restore","configure","configurePolicy","addRoadCurve","removeRoadCurve").contains(action)) require(owner(u));
                 else if(!Set.of("checkin","checkout","requestVisitor","valet","reportLostTicket","recordPayment").contains(action)) require(!u.get("role").equals("staff"));
                 switch(action) {
+                    case "resetPresentation" -> {
+                        require(owner(u)&&Boolean.TRUE.equals(s.get("presentation")));
+                        require(Boolean.TRUE.equals(request.get("confirmed")));
+                        preparePresentation(s);
+                    }
                     case "sampleTime" -> {
                         require(owner(u)&&Boolean.TRUE.equals(s.get("sample")));
                         int minutes=integer(request,"minutes",0,1440);
@@ -348,7 +369,7 @@ public final class PlatformService {
                         long tendered=method.equals("CASH")?integer(request,"cashTendered",0,Integer.MAX_VALUE):fee;
                         if(tendered<fee) throw new IllegalArgumentException("เงินสดไม่พอชำระค่าจอด");
                         t.put("fee",fee); t.put("paymentId",id()); t.put("paidAt",siteTime(s).toString());
-                        t.put("paymentMethod","MANUAL_"+method);t.put("paymentReference",reference);
+                        t.put("paymentMethod",(Boolean.TRUE.equals(s.get("sample"))?"SIMULATED_":"MANUAL_")+method);t.put("paymentReference",reference);
                         t.put("cashTendered",tendered);t.put("change",tendered-fee);
                         operationResult=new LinkedHashMap<>(t);
                     }

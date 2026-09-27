@@ -76,7 +76,11 @@ public final class ParkingLayout {
     }
     /** Rich, clearly fictional starter map in a dedicated sample tenant. */
     public static List<Map<String,Object>> sampleLayout(String businessType) {
-        List<Map<String,Object>> cells=template(businessType);
+        List<Map<String,Object>> cells=template(businessType.equals("CUSTOM")?"PUBLIC":businessType);
+        for(var c:cells) {
+            if(c.get("id").equals("A20"))c.put("slotType","LARGE");
+            if(c.get("id").equals("B20"))c.put("slotType","VIP");
+        }
         cells.set(1,cell("R1","BARRIER",1,7,"ไม้กั้นเข้า","STANDARD"));
         cells.set(3,cell("R3","CROSSING",3,7,"ทางม้าลาย","STANDARD"));
         cells.set(22,cell("R22","BARRIER",22,7,"ไม้กั้นออก","STANDARD"));

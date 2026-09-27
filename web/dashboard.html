@@ -48,6 +48,8 @@
     <script src="js/history-export.js" defer></script>
 
     <link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/studio.css">
+<script src="js/studio.js" defer></script>
 </head>
 <body class="dark-theme">
     <div id="notice" role="status" aria-live="polite" hidden></div>
@@ -106,7 +108,8 @@
             </div>
             <div id="identity" class="session-status-panel"><span id="account" class="user-badge"></span><button id="logout" class="logout-btn" type="button">ออกจากระบบ</button></div>
         </header>
-        <div class="live-workspace-picker"><label>ลานจอดของบริษัท <select id="sitePicker" class="form-input"></select></label><span id="companyContext"></span><span id="liveMode" class="mono-badge"></span></div>
+        <div class="live-workspace-picker"><label>ลานจอดของบริษัท <select id="sitePicker" class="form-input"></select></label><span id="companyContext"></span><span id="liveMode" class="mono-badge"></span><button id="startPresentation" class="btn-primary" hidden>▶ เปิดลานพรีเซนต์</button><button id="resetPresentation" class="btn-secondary" hidden>↻ เริ่มสาธิตใหม่</button></div>
+        <details id="presentationGuide" class="presentation-guide" hidden open><summary>DEMO STUDIO · เส้นทางพรีเซนต์ 5 นาที</summary><p>ข้อมูลสมมุติ บันทึกบนเซิร์ฟเวอร์ · ไม่รับเงินจริงและไม่เชื่อมอุปกรณ์จริง</p><div class="demo-steps"><button data-demo-tab="entry-gate"><b>01</b> สแกนทะเบียน → รับรถ</button><button onclick="fastForward(60)"><b>02</b> จำลองเวลา +1 ชม.</button><button data-demo-tab="exit-cashier"><b>03</b> จำลองชำระ → รถออก</button><button data-demo-tab="vehicle-history"><b>04</b> ประวัติ / Excel</button><button data-demo-tab="oop-docs"><b>05</b> อธิบาย OOP</button></div></details>
 
         <!-- Live Gate Display Board Banner (Observer Pattern) -->
         <div class="display-board-banner">
@@ -464,8 +467,8 @@
 
                                 <div id="payDetailsPromptPay" class="pay-detail-box"><p>รับชำระผ่าน QR ของร้านภายนอก แล้วตรวจยอดในบัญชีร้านก่อนยืนยัน ระบบนี้ยังไม่สร้าง QR หรือยืนยันเงินจากธนาคารอัตโนมัติ</p><strong id="qrAmountDisplay"></strong></div>
                                 <div id="payDetailsCredit" class="pay-detail-box"><p>รับชำระด้วยเครื่องรูดบัตรของร้าน แล้วกรอกเลขอ้างอิงจากใบเสร็จ ไม่กรอกเลขบัตรหรือ CVV ในระบบนี้</p></div>
-                                <label>เลขอ้างอิงการชำระภายนอก (PromptPay / บัตร)<input id="paymentReference" class="form-input" maxlength="160"></label>
-                                <label class="live-confirm"><input id="paymentConfirmed" type="checkbox">ตรวจสอบแล้วว่าได้รับชำระเงินจริง หรือยอดเป็นศูนย์</label>
+                                <button type="button" id="simulatePayment" class="btn-primary" hidden>✦ จำลองรับชำระสำเร็จ</button><label>เลขอ้างอิงการชำระภายนอก (PromptPay / บัตร)<input id="paymentReference" class="form-input" maxlength="160"></label>
+                                <label class="live-confirm"><input id="paymentConfirmed" type="checkbox"><span id="paymentConfirmationLabel">ตรวจสอบแล้วว่าได้รับชำระเงินจริง หรือยอดเป็นศูนย์</span></label>
                                 <!-- Cash Detail -->
                                 <div id="payDetailsCash" class="pay-detail-box">
                                     <div class="form-group">

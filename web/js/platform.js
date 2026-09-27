@@ -77,7 +77,7 @@
             if(!allState.tenants.some(t=>t.sample)) content+=button('sampleWorkspace','＋ สร้างพื้นที่ทดลอง',false,writeDisabled());
         } else if(tab==='sites') {
             const slots=state.sites.flatMap(s=>s.published).filter(c=>c.type==='SLOT').length, active=state.sites.flatMap(s=>s.tickets).filter(t=>t.status==='ACTIVE').length;
-            content=heading('ลานจอดของบริษัท',escape(state.tenants[0]?.name||'พื้นที่ลูกค้า')+' · ข้อมูลเฉพาะบริษัทนี้',owner()&&state.tenants.length?button('createSite','＋ สร้างลานจอด',true,writeDisabled()):'');
+            content=heading('ลานจอดของบริษัท',escape(state.tenants[0]?.name||'พื้นที่ลูกค้า')+' · ข้อมูลเฉพาะบริษัทนี้',owner()&&state.tenants.length?button('createSite','＋ สร้างลานจอด',true,writeDisabled())+button('presentation','▶ ลานพรีเซนต์',false,writeDisabled()):'');
             content+=`<div class="metrics">${metric('ลานจอดทั้งหมด',state.sites.length)}${metric('ช่องที่เผยแพร่',slots)}${metric('รถในลาน',active)}${metric('บริษัทที่เข้าถึงได้',state.tenants.length)}</div>`;
             content+=`<div class="cards">${state.sites.map(s=>`<article class="card"><div class="card-top"><span class="site-icon">▦</span><span class="tag">${s.sample?'ข้อมูลสมมุติ · ':''}${escape(C.templates[s.businessType]?.[0]||s.businessType)}</span></div><h2>${escape(s.name)}</h2><p>${escape(C.templates[s.businessType]?.[1]||'')}</p><div class="site-stats"><span>${s.published.filter(c=>c.type==='SLOT').length} ช่องใช้งาน</span><span>${s.versions.length?'เผยแพร่แล้ว':'แบบร่าง'}</span></div><p>ราคา ${money(s.rate)}/ชม. · ฟรี ${s.freeMinutes} นาทีแรก</p><div class="actions">${button('openSite','เปิดลาน →',true,false,`data-id="${escape(s.id)}"`)}${owner()?button('editSite','ออกแบบผัง',false,false,`data-id="${escape(s.id)}"`):''}</div></article>`).join('')}</div>`;
             if(!state.sites.length) content+=`<div class="card onboarding"><h2>เริ่มสร้างลานจอดของบริษัท</h2><p>สร้างลานคอนโด ห้าง และโรงแรมที่มีผังพร้อมทดลอง พร้อมข้อมูลประวัติสมมุติ 3 เดือนในบริษัททดลองแยกต่างหาก</p><div class="actions">${state.user.role==='super_admin'&&!allState.tenants.some(t=>t.sample)?button('sampleWorkspace','＋ สร้างพื้นที่ทดลอง',true,writeDisabled()):''}${state.user.role==='super_admin'?button('tenant','สร้างบริษัทจริง',false,writeDisabled()):''}</div></div>`;
@@ -208,6 +208,10 @@
             const u=state.users.find(u=>u.id===element.dataset.id);
             if(!u||!confirm(`ยืนยัน ${name==='revokeUser'?'ออกจากระบบทุกเครื่อง':u.active===false?'เปิดบัญชี':'ปิดบัญชี'}: ${u.username}?`)) return;
             await command(name==='toggleUser'?'setUserActive':'revokeSessions',{userId:u.id,active:u.active===false}); showWorkspace();
+        }
+        if(name==='presentation') {
+            await command('createPresentation',{tenantId:state.tenants[0].id});
+            const demo=state.sites.find(s=>s.presentation);location.href='dashboard.html?site='+encodeURIComponent(demo.id)+(platformOwner()?'&tenant='+encodeURIComponent(tenantScope):'');return;
         }
         if(name==='openSite'||name==='editSite') { if(!checkDirty())return; siteId=element.dataset.id; tab=name==='editSite'?'editor':'operations';loadDraft();showWorkspace(); }
         if(name==='createSite') modal('สร้างลานจอด',field('name','ชื่อลาน')+(state.user.role==='super_admin'?select('tenantId','บริษัท',Object.fromEntries(state.tenants.map(t=>[t.id,t.name]))):'')+select('businessType','แม่แบบ',Object.fromEntries(Object.entries(C.templates).map(([k,v])=>[k,`${v[0]} — ${v[1]}`])))+'<p class="help">แม่แบบเป็นจุดเริ่มต้น ไม่ล็อกการแก้ไข แม่แบบใช้ผังเริ่มต้นร่วมกัน ปรับให้ตรงพื้นที่จริงก่อนเผยแพร่</p>',async f=>{const before=new Set(state.sites.map(s=>s.id));await command('createSite',Object.fromEntries(f));siteId=state.sites.find(s=>!before.has(s.id))?.id||siteId;tab='editor';loadDraft();});
