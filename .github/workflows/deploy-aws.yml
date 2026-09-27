@@ -31,6 +31,12 @@ jobs:
           node tests/platform-core.test.cjs
           python tests/test_platform.py bin
 
+      - name: Validate HTTPS configurations
+        run: |
+          for config in Caddyfile Caddyfile.zerossl; do
+            docker run --rm -e PLATFORM_DOMAIN=parking.example.com -e ZEROSSL_EAB_KID=dGVzdA -e ZEROSSL_EAB_HMAC_KEY=dGVzdA -v "$PWD/ops/$config:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          done
+
       - name: Configure SSH
         env:
           AWS_SSH_PRIVATE_KEY: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
@@ -43,6 +49,8 @@ jobs:
 
       - name: Build deployment package and environment
         env:
+          ZEROSSL_EAB_KID: ${{ secrets.ZEROSSL_EAB_KID }}
+          ZEROSSL_EAB_HMAC_KEY: ${{ secrets.ZEROSSL_EAB_HMAC_KEY }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           PLATFORM_ADMIN_PASSWORD: ${{ secrets.PLATFORM_ADMIN_PASSWORD }}
           PLATFORM_DOMAIN: ${{ vars.PLATFORM_DOMAIN }}
@@ -55,7 +63,16 @@ jobs:
           domain = os.environ.get("PLATFORM_DOMAIN", "").strip()
           if domain and not re.fullmatch(r"(?=.{1,253}$)[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,63}", domain):
               raise SystemExit("PLATFORM_DOMAIN must be a DNS hostname")
+          kid = os.environ.get("ZEROSSL_EAB_KID", "").strip()
+          hmac = os.environ.get("ZEROSSL_EAB_HMAC_KEY", "").strip()
+          if bool(kid) != bool(hmac):
+              raise SystemExit("Set both ZEROSSL_EAB_KID and ZEROSSL_EAB_HMAC_KEY, or neither")
+          if any(value and not re.fullmatch(r"[A-Za-z0-9_-]+={0,2}", value) for value in (kid, hmac)):
+              raise SystemExit("ZeroSSL EAB credentials must use base64url characters")
           values = {
+              "ZEROSSL_EAB_KID": kid,
+              "ZEROSSL_EAB_HMAC_KEY": hmac,
+              "CADDY_CONFIG": "./ops/Caddyfile.zerossl" if kid else "./ops/Caddyfile",
               "DB_PASSWORD": os.environ["DB_PASSWORD"],
               "PLATFORM_ADMIN_PASSWORD": os.environ["PLATFORM_ADMIN_PASSWORD"],
               "APP_BIND_IP": "127.0.0.1" if domain else "0.0.0.0",
@@ -66,6 +83,7 @@ jobs:
           }
           if any(any(c in value for c in "\n\r\x00'") for value in values.values()):
               raise SystemExit("Deployment values must be single-line without single quotes")
+          os.umask(0o077)
           Path("/tmp/parking-platform.env").write_text(
               "".join(f"{key}='{value}'\n" for key, value in values.items()), encoding="utf-8")
           PY
