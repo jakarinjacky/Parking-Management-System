@@ -21,6 +21,17 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   page.on('dialog',d=>d.accept());
   await page.goto('http://localhost:8080/platform.html');
   await page.screenshot({animations:'disabled',path:path.join(tmp,'studio-login-desktop.png'),fullPage:true});
+  await page.locator('.pricing-cta').filter({hasText:'Business'}).click();
+  await page.locator('[data-demo-contact="LINE"]').click();
+  assert((await page.locator('#contactPreview').innerText()).includes('990'));
+  await page.locator('[data-demo-contact="อีเมล"]').click();
+  assert((await page.locator('#contactPreview').innerText()).includes('ยังไม่ได้ส่งข้อความ'));
+  await page.screenshot({animations:'disabled',path:path.join(tmp,'public-contact-desktop.png'),fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({animations:'disabled',path:path.join(tmp,'public-contact-mobile.png'),fullPage:true});
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Contact page must fit mobile');
+  await page.goto('http://localhost:8080/platform.html');
+  await page.setViewportSize({width:1440,height:1000});
   await page.locator('#loginForm [name=username]').fill('owner');
   await page.locator('#loginForm [name=password]').fill('DemoPass123!');
   await page.locator('#loginForm button[type=submit]').click();
