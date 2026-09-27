@@ -160,6 +160,19 @@ public final class PlatformService {
     public synchronized Map<String,Object> view(String userId) {
         return atomic(()->viewLocked(userId));
     }
+    /** Scoped workspace reads validate ownership before returning any customer data. */
+    public synchronized Map<String,Object> workspace(String userId,String tenantId) {
+        return atomic(()->{
+            var u=user(userId);
+            require(superUser(u)||u.get("tenantId").equals(tenantId));
+            require(list(state,"tenants").stream().anyMatch(t->t.get("id").equals(tenantId)));
+            var result=new LinkedHashMap<>(viewLocked(userId));
+            result.put("tenants",list(result,"tenants").stream().filter(t->t.get("id").equals(tenantId)).toList());
+            for(String key:List.of("sites","users","audit"))
+                result.put(key,list(result,key).stream().filter(v->tenantId.equals(v.get("tenantId"))).toList());
+            return result;
+        });
+    }
     private Map<String,Object> viewLocked(String userId) {
         var u=user(userId);
         purgeExpiredHistory();

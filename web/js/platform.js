@@ -7,8 +7,20 @@
     const money=n=>Number(n||0).toLocaleString('th-TH',{style:'currency',currency:'THB'});
     const time=t=>t?new Date(t).toLocaleString('th-TH'):'—';
     const roles={super_admin:'เจ้าของแพลตฟอร์ม',owner:'เจ้าของบริษัท',admin:'ผู้ดูแล',staff:'พนักงาน'};
-    let state,siteId='',tab='sites',preview=false,busy=false,draft=[],dirty=false,tool='SELECT',floor=1,selected='',undo=[],redo=[],routeIds=[],noticeTimer,modalSubmit;
+    let allState,tenantScope=new URLSearchParams(location.search).get('tenant')||'',state,siteId='',tab='sites',preview=false,busy=false,draft=[],dirty=false,tool='SELECT',floor=1,selected='',undo=[],redo=[],routeIds=[],noticeTimer,modalSubmit;
     let filters={from:'',to:'',plate:''};
+    // Platform operators explicitly enter one customer's workspace. Customers are
+    // already tenant-filtered by the API; this filter only scopes the operator UI.
+    function acceptState(next) {
+        allState=next;
+        if(next.user.role!=='super_admin') { tenantScope=next.user.tenantId; state=next; return; }
+        if(!next.tenants.some(t=>t.id===tenantScope)) tenantScope='';
+        state={...next,tenants:next.tenants.filter(t=>t.id===tenantScope),
+            sites:next.sites.filter(s=>s.tenantId===tenantScope),
+            users:next.users.filter(u=>u.tenantId===tenantScope),
+            audit:next.audit.filter(a=>a.tenantId===tenantScope)};
+    }
+    const platformOwner=()=>state?.user.role==='super_admin';
     const current=()=>state.sites.find(s=>s.id===siteId);
     const owner=()=>['owner','super_admin'].includes(state.user.role);
     const manager=()=>state.user.role!=='staff';
@@ -23,19 +35,27 @@
     async function command(action,data={}) {
         if(writeDisabled()) throw new Error(preview?'ตัวอย่างนี้อ่านอย่างเดียว กรุณารัน Java Backend เพื่อบันทึก':'กำลังบันทึก กรุณารอ');
         busy=true;
-        try { state=await api('command',{action,revision:state.revision,siteId,...data}); return state; }
+        try { acceptState(await api('command',{action,revision:state.revision,siteId,...data})); return state; }
         finally { busy=false; }
     }
     function checkDirty() { return !dirty||confirm('มีผังที่ยังไม่บันทึก ต้องการออกและทิ้งการแก้ไขหรือไม่?'); }
     function loadDraft() { draft=C.clone(current()?.draft||[]); dirty=false; selected=''; undo=[]; redo=[]; routeIds=[]; }
     function showWorkspace() {
         $('loginScreen').hidden=true; $('workspace').hidden=false;
+        if(platformOwner()&&!tenantScope) tab='customers';
+        if(!platformOwner()&&tab==='customers') tab='sites';
         if(!state.sites.some(s=>s.id===siteId)) siteId=state.sites[0]?.id||'';
         $('accountName').textContent=`${state.user.username} · ${roles[state.user.role]}`;
         $('modeBanner').textContent=preview?'ตัวอย่างอ่านอย่างเดียว • ไม่มีการบันทึกหรือควบคุมอุปกรณ์จริง':current()?.sample?'ลานตัวอย่าง · ทะเบียน ประวัติ และอุปกรณ์เป็นข้อมูลสมมุติ · แยกบริษัทจากข้อมูลจริง':'ข้อมูลจริงบนเซิร์ฟเวอร์ • อุปกรณ์รองรับ LED bench เมื่อเปิด Gateway';
+        $('workspaceLabel').textContent=platformOwner()?'เจ้าของแพลตฟอร์ม':'พื้นที่ลูกค้า';
+        $('tenantContext').textContent=state.tenants[0]?.name||(platformOwner()?'ศูนย์จัดการลูกค้า':'ยังไม่มีบริษัท');
+        $('backToCustomers').hidden=!platformOwner()||!tenantScope;
+        if(platformOwner()) $('modeBanner').textContent=tenantScope?`กำลังดูแลลูกค้า: ${state.tenants[0].name} · ดำเนินการด้วยบัญชีเจ้าของแพลตฟอร์ม`:'ศูนย์เจ้าของแพลตฟอร์ม · เลือกลูกค้าเพื่อเข้าพื้นที่ทำงาน';
+        document.querySelectorAll('a[href^="dashboard.html"]').forEach(a=>a.href=platformOwner()&&tenantScope?`dashboard.html?tenant=${encodeURIComponent(tenantScope)}`:'dashboard.html');
+        $('sitePicker').hidden=platformOwner()&&!tenantScope;
         $('sitePicker').innerHTML=state.sites.length?options(Object.fromEntries(state.sites.map(s=>[s.id,s.name])),siteId):'<option>ยังไม่มีลานจอด</option>';
-        const pages={sites:'▦  ลานจอดทั้งหมด',editor:'▧  ออกแบบผัง',operations:'↔  รถเข้า–ออก',history:'◷  ประวัติ / Excel',members:'◎  สมาชิก / การจอง',devices:'⌁  อุปกรณ์',settings:'⚙  ตั้งค่าลาน',users:'♙  ผู้ใช้ / บริษัท',audit:'≡  บันทึกกิจกรรม'};
-        $('nav').innerHTML=Object.entries(pages).filter(([id])=>owner()||!['editor','settings','users','audit'].includes(id)&& (manager()||!['history','members','devices'].includes(id))).map(([id,label])=>`<button data-nav="${id}" class="${id===tab?'active':''}">${label}</button>`).join('');
+        const pages={...(platformOwner()?{customers:'♙  ลูกค้าแพลตฟอร์ม'}:{}),sites:'▦  ลานจอดทั้งหมด',editor:'▧  ออกแบบผัง',operations:'↔  รถเข้า–ออก',history:'◷  ประวัติ / Excel',members:'◎  สมาชิก / การจอง',devices:'⌁  อุปกรณ์',settings:'⚙  ตั้งค่าลาน',users:'♙  ทีมงานของบริษัท',audit:'≡  บันทึกกิจกรรม'};
+        $('nav').innerHTML=Object.entries(pages).filter(([id])=>platformOwner()&&!tenantScope?id==='customers':owner()||!['editor','settings','users','audit'].includes(id)&& (manager()||!['history','members','devices'].includes(id))).map(([id,label])=>`<button data-nav="${id}" class="${id===tab?'active':''}">${label}</button>`).join('');
         render();
     }
     function heading(title,subtitle,actions='') { return `<div class="page-title"><div><span class="eyebrow">GREENPARK / ${escape(tab.toUpperCase())}</span><h1>${title}</h1><p>${subtitle}</p></div><div class="actions">${actions}</div></div>`; }
@@ -45,16 +65,22 @@
     function table(headers,rows) { return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`; }
     function render() {
         let content=''; const s=current();
-        if(tab!=='sites'&&tab!=='users'&&tab!=='audit'&&!s) {
-            $('main').innerHTML=heading('ยังไม่มีลานจอด','สร้างลานก่อนใช้เครื่องมือออกแบบและรับรถ')+`<div class="card onboarding"><h2>เริ่มออกแบบลานจอด</h2><p>ลานตัวอย่างมีถนน 2 ชั้น ช่องจอด กล้องและไม้กั้นจำลอง พร้อมประวัติรถ 3 เดือน ข้อมูลทั้งหมดระบุว่าเป็นตัวอย่างและอยู่ในบริษัททดลองแยกต่างหาก</p><div class="actions">${state.user.role==='super_admin'&&!state.tenants.some(t=>t.sample)?button('sampleWorkspace','＋ สร้างพื้นที่ทดลอง',true,writeDisabled()):''}${state.user.role==='super_admin'?button('tenant','สร้างบริษัทจริง',false,writeDisabled()):''}${owner()&&state.tenants.length?button('createSite','สร้างลานจอดจริง',false,writeDisabled()):''}</div></div>`;
+        if(tab!=='customers'&&tab!=='sites'&&tab!=='users'&&tab!=='audit'&&!s) {
+            $('main').innerHTML=heading('ยังไม่มีลานจอด','สร้างลานก่อนใช้เครื่องมือออกแบบและรับรถ')+`<div class="card onboarding"><h2>เริ่มออกแบบลานจอด</h2><p>ลานตัวอย่างมีถนน 2 ชั้น ช่องจอด กล้องและไม้กั้นจำลอง พร้อมประวัติรถ 3 เดือน ข้อมูลทั้งหมดระบุว่าเป็นตัวอย่างและอยู่ในบริษัททดลองแยกต่างหาก</p><div class="actions">${state.user.role==='super_admin'&&!allState.tenants.some(t=>t.sample)?button('sampleWorkspace','＋ สร้างพื้นที่ทดลอง',true,writeDisabled()):''}${state.user.role==='super_admin'?button('tenant','สร้างบริษัทจริง',false,writeDisabled()):''}${owner()&&state.tenants.length?button('createSite','สร้างลานจอดจริง',false,writeDisabled()):''}</div></div>`;
             return;
         }
-        if(tab==='sites') {
+        if(tab==='customers'&&platformOwner()) {
+            content=heading('ศูนย์เจ้าของแพลตฟอร์ม','สร้างบัญชีลูกค้าและเลือกบริษัทที่ต้องการดูแล',button('tenant','＋ เพิ่มลูกค้า / เจ้าของบริษัท',true,writeDisabled()));
+            content+=`<div class="metrics">${metric('บริษัทลูกค้า',allState.tenants.filter(t=>!t.sample).length)}${metric('ลานจอด',allState.sites.length)}${metric('บัญชีลูกค้า',allState.users.filter(u=>u.role!=='super_admin').length)}</div>`;
+            content+=`<div class="card"><h2>บัญชีลูกค้าแยกบริษัท</h2><p>ลูกค้าเข้าสู่ระบบด้วยบัญชีของตนเอง เห็นเฉพาะลาน ประวัติ รายได้ และทีมงานในบริษัทของตน เจ้าของแพลตฟอร์มเลือกดูแลลูกค้าได้ทีละบริษัท</p><a href="platform.html">ลิงก์เข้าสู่ระบบสำหรับลูกค้า</a></div>`;
+            content+=table(['บริษัท','บัญชีเจ้าของ','ลาน','ประเภท','จัดการ'],allState.tenants.map(t=>[escape(t.name),allState.users.filter(u=>u.tenantId===t.id&&u.role==='owner').map(u=>escape(u.username)+(u.active===false?' (ปิดใช้งาน)':'')).join(', ')||'ยังไม่มีบัญชีเจ้าของ',allState.sites.filter(s=>s.tenantId===t.id).length,t.sample?'ข้อมูลตัวอย่าง':'ลูกค้า',button('enterTenant','เข้าพื้นที่ลูกค้า →',true,false,`data-id="${escape(t.id)}"`)]));
+            if(!allState.tenants.some(t=>t.sample)) content+=button('sampleWorkspace','＋ สร้างพื้นที่ทดลอง',false,writeDisabled());
+        } else if(tab==='sites') {
             const slots=state.sites.flatMap(s=>s.published).filter(c=>c.type==='SLOT').length, active=state.sites.flatMap(s=>s.tickets).filter(t=>t.status==='ACTIVE').length;
-            content=heading('ทุกพื้นที่ ในมุมมองเดียว','เลือกแม่แบบ แล้วปรับลานให้เป็นของคุณ',owner()&&state.tenants.length?button('createSite','＋ สร้างลานจอด',true,writeDisabled()):'');
+            content=heading('ลานจอดของบริษัท',escape(state.tenants[0]?.name||'พื้นที่ลูกค้า')+' · ข้อมูลเฉพาะบริษัทนี้',owner()&&state.tenants.length?button('createSite','＋ สร้างลานจอด',true,writeDisabled()):'');
             content+=`<div class="metrics">${metric('ลานจอดทั้งหมด',state.sites.length)}${metric('ช่องที่เผยแพร่',slots)}${metric('รถในลาน',active)}${metric('บริษัทที่เข้าถึงได้',state.tenants.length)}</div>`;
             content+=`<div class="cards">${state.sites.map(s=>`<article class="card"><div class="card-top"><span class="site-icon">▦</span><span class="tag">${s.sample?'ข้อมูลสมมุติ · ':''}${escape(C.templates[s.businessType]?.[0]||s.businessType)}</span></div><h2>${escape(s.name)}</h2><p>${escape(C.templates[s.businessType]?.[1]||'')}</p><div class="site-stats"><span>${s.published.filter(c=>c.type==='SLOT').length} ช่องใช้งาน</span><span>${s.versions.length?'เผยแพร่แล้ว':'แบบร่าง'}</span></div><p>ราคา ${money(s.rate)}/ชม. · ฟรี ${s.freeMinutes} นาทีแรก</p><div class="actions">${button('openSite','เปิดลาน →',true,false,`data-id="${escape(s.id)}"`)}${owner()?button('editSite','ออกแบบผัง',false,false,`data-id="${escape(s.id)}"`):''}</div></article>`).join('')}</div>`;
-            if(!state.sites.length) content+=`<div class="card onboarding"><h2>เริ่มจากลานตัวอย่าง</h2><p>สร้างลานคอนโด ห้าง และโรงแรมที่มีผังพร้อมทดลอง พร้อมข้อมูลประวัติสมมุติ 3 เดือนในบริษัททดลองแยกต่างหาก</p><div class="actions">${state.user.role==='super_admin'&&!state.tenants.some(t=>t.sample)?button('sampleWorkspace','＋ สร้างพื้นที่ทดลอง',true,writeDisabled()):''}${state.user.role==='super_admin'?button('tenant','สร้างบริษัทจริง',false,writeDisabled()):''}</div></div>`;
+            if(!state.sites.length) content+=`<div class="card onboarding"><h2>เริ่มสร้างลานจอดของบริษัท</h2><p>สร้างลานคอนโด ห้าง และโรงแรมที่มีผังพร้อมทดลอง พร้อมข้อมูลประวัติสมมุติ 3 เดือนในบริษัททดลองแยกต่างหาก</p><div class="actions">${state.user.role==='super_admin'&&!allState.tenants.some(t=>t.sample)?button('sampleWorkspace','＋ สร้างพื้นที่ทดลอง',true,writeDisabled()):''}${state.user.role==='super_admin'?button('tenant','สร้างบริษัทจริง',false,writeDisabled()):''}</div></div>`;
         } else if(tab==='editor') {
             content=heading('ออกแบบพื้นที่ของคุณ',`${escape(s.name)} · Grid 24 × 16 ต่อชั้น · ช่องละหนึ่งหน่วยเชิงตรรกะ`,button('sampleLayout','ใส่ผังตัวอย่าง',false,writeDisabled())+button('validate','ตรวจผัง')+button('saveLayout','บันทึกแบบร่าง',false,writeDisabled())+button('publish','เผยแพร่ผัง',true,writeDisabled()));
             content+=`<div class="editor"><div class="tools">${Object.entries(C.types).map(([type,label])=>`<button data-tool="${type}" draggable="${!['SELECT','ERASE'].includes(type)}" class="${tool===type?'selected':''}">${label}</button>`).join('')}<p class="help">เลือกเครื่องมือแล้วแตะตาราง หรือลากลงพื้นที่<br>เลือก/ย้าย: ลากชิ้นส่วนเดิม<br>ถนนต่อมุมกันได้ด้วยช่องติดกัน</p></div><div class="canvas-shell"><div class="canvas-toolbar"><select id="floorPicker" aria-label="ชั้น">${options(Object.fromEntries(Array.from({length:8},(_,i)=>[i+1,`ชั้น ${i+1}`])),floor)}</select>${button('undo','↶ ย้อน',false,!undo.length)}${button('redo','↷ ทำซ้ำ',false,!redo.length)}<span class="help">${dirty?'● ยังไม่บันทึก':'บันทึกแล้ว'} · ${draft.filter(c=>c.type==='SLOT').length} ช่อง</span></div><div class="canvas-scroll">${grid(draft)}</div><div class="legend"><span><b>สีเขียว</b> ช่องจอด</span><span>สีเทา ถนน</span><span>ทางเดียว → ↓ ← ↑</span></div>${inspector()}</div></div>`;
@@ -83,7 +109,7 @@
             content=heading('ตั้งค่าลาน',escape(s.name),button('pricing','ราคา / สมาชิก / ผู้มาติดต่อ',true,writeDisabled()));
             content+=`<form id="settingsForm" class="card"><div class="form-grid"><label>ชื่อลาน<input name="name" value="${escape(s.name)}" maxlength="160" required></label><label>ที่อยู่<input name="address" value="${escape(s.address)}" maxlength="160" required></label><label>ราคา / ชั่วโมง (บาท)<input name="rate" type="number" min="0" max="10000" step="1" value="${s.rate}" required></label><label>ฟรีนาทีแรก<input name="freeMinutes" type="number" min="0" max="1440" value="${s.freeMinutes}" required></label></div><label class="check-label"><input name="active" type="checkbox" ${s.active?'checked':''}>เปิดรับรถใหม่</label><label class="check-label"><input name="membership" type="checkbox" ${s.features.membership?'checked':''}>เปิดสมาชิก</label><label class="check-label"><input name="reservation" type="checkbox" ${s.features.reservation?'checked':''}>เปิดการจอง</label><p class="help">คิดเฉพาะเวลาที่เกินช่วงฟรี ปัดขึ้นเป็นชั่วโมง เก็บอัตราขณะรถเข้ากับตั๋วเดิม การเปลี่ยนราคาจึงไม่เปลี่ยนตั๋วที่กำลังจอด</p><button class="primary" ${writeDisabled()?'disabled':''}>บันทึกการตั้งค่า</button></form><div class="card section-gap"><h3>ส่วนขยาย ${escape(C.templates[s.businessType][0])}</h3><p>ตั้งกฎราคาและสมาชิกได้จากปุ่มด้านบน มีคูปองแบบเจ้าหน้าที่ตรวจและ Valet ตามประเภทลาน ส่วน PMS, POS และการชำระเงินออนไลน์ยังไม่เชื่อมผู้ให้บริการ</p></div>`;
         } else if(tab==='users') {
-            content=heading('บริษัทและทีมงาน','สิทธิ์ถูกตรวจจาก Session ฝั่งเซิร์ฟเวอร์',button('user','＋ พนักงาน / ผู้ดูแล',false,writeDisabled()||!state.sites.length)+(state.user.role==='super_admin'?button('tenant','＋ บริษัท / เจ้าของ',true,writeDisabled()):''));
+            content=heading('ทีมงานของบริษัท','บัญชีเหล่านี้เข้าถึงเฉพาะบริษัทนี้ตามสิทธิ์ที่กำหนด',button('user','＋ พนักงาน / ผู้ดูแล',false,writeDisabled()||!state.sites.length));
             content+=table(['บริษัท','แพ็กเกจ'],state.tenants.map(t=>[escape(t.name),escape(t.plan)+' · ยังไม่มีเรียกเก็บเงิน']));
             content+=`<h3 class="section-gap">บัญชีผู้ใช้งาน</h3>`+table(['ชื่อบัญชี','สิทธิ์','บริษัท','สถานะ','จัดการ'],state.users.map(u=>[escape(u.username),roles[u.role],escape(state.tenants.find(t=>t.id===u.tenantId)?.name||'แพลตฟอร์ม'),u.active===false?'ปิดใช้งาน':'ใช้งาน',u.id!==state.user.id&&u.role!=='super_admin'&&(state.user.role==='super_admin'||['admin','staff'].includes(u.role))?button('toggleUser',u.active===false?'เปิดบัญชี':'ปิดบัญชี',false,writeDisabled(),`data-id="${escape(u.id)}"`)+button('revokeUser','ออกจากระบบทุกเครื่อง',false,writeDisabled(),`data-id="${escape(u.id)}"`):'—']));
         } else if(tab==='audit') {
@@ -139,10 +165,15 @@
     }
     async function action(name,element) {
         const s=current();
+        if(name==='enterTenant') {
+            if(!checkDirty())return;
+            tenantScope=element.dataset.id; acceptState(allState); siteId='';tab='sites';filters={from:'',to:'',plate:''};floor=1;loadDraft();showWorkspace();return;
+        }
         if(name==='sampleWorkspace') {
             if(!confirm('สร้างบริษัททดลองพร้อมลานคอนโด ห้าง โรงแรม และประวัติสมมุติ 3 เดือน? ข้อมูลนี้แยกจากบริษัทจริง'))return;
             const before=new Set(state.sites.map(item=>item.id));
             await command('createSampleWorkspace');
+            tenantScope=allState.tenants.find(t=>t.sample).id;acceptState(allState);
             siteId=state.sites.find(item=>!before.has(item.id))?.id||'';
             tab='editor';floor=1;loadDraft();showWorkspace();notice('สร้างพื้นที่ทดลองแล้ว เลือกเครื่องมือทางซ้ายเพื่อแก้ผัง หรือสลับชั้นด้านบน');return;
         }
@@ -179,7 +210,7 @@
         }
         if(name==='openSite'||name==='editSite') { if(!checkDirty())return; siteId=element.dataset.id; tab=name==='editSite'?'editor':'operations';loadDraft();showWorkspace(); }
         if(name==='createSite') modal('สร้างลานจอด',field('name','ชื่อลาน')+(state.user.role==='super_admin'?select('tenantId','บริษัท',Object.fromEntries(state.tenants.map(t=>[t.id,t.name]))):'')+select('businessType','แม่แบบ',Object.fromEntries(Object.entries(C.templates).map(([k,v])=>[k,`${v[0]} — ${v[1]}`])))+'<p class="help">แม่แบบเป็นจุดเริ่มต้น ไม่ล็อกการแก้ไข แม่แบบใช้ผังเริ่มต้นร่วมกัน ปรับให้ตรงพื้นที่จริงก่อนเผยแพร่</p>',async f=>{const before=new Set(state.sites.map(s=>s.id));await command('createSite',Object.fromEntries(f));siteId=state.sites.find(s=>!before.has(s.id))?.id||siteId;tab='editor';loadDraft();});
-        if(name==='tenant') modal('สร้างบริษัทพร้อมเจ้าของ',field('name','ชื่อบริษัท')+field('username','บัญชีเจ้าของ','text','','pattern="[a-z0-9._-]{3,40}"')+field('password','รหัสผ่าน (12 ตัวขึ้นไป)','password','','minlength="12" maxlength="128"'),f=>command('createTenant',Object.fromEntries(f)));
+        if(name==='tenant') modal('สร้างบริษัทพร้อมเจ้าของ',field('name','ชื่อบริษัท')+field('username','บัญชีเจ้าของ','text','','pattern="[a-z0-9._-]{3,40}"')+field('password','รหัสผ่าน (12 ตัวขึ้นไป)','password','','minlength="12" maxlength="128"'),async f=>{await command('createTenant',Object.fromEntries(f));tab='customers';tenantScope='';acceptState(allState);});
         if(name==='user') modal('เพิ่มสมาชิกทีม',field('username','ชื่อบัญชี','text','','pattern="[a-z0-9._-]{3,40}"')+field('password','รหัสผ่าน (12 ตัวขึ้นไป)','password','','minlength="12" maxlength="128"')+select('role','สิทธิ์',{admin:'ผู้ดูแล',staff:'พนักงาน'})+select('siteId','ลานที่รับผิดชอบ',Object.fromEntries(state.sites.map(s=>[s.id,s.name]))),f=>{const chosen=state.sites.find(s=>s.id===f.get('siteId'));return command('createUser',{username:f.get('username'),password:f.get('password'),role:f.get('role'),tenantId:chosen.tenantId,siteIds:[chosen.id]});});
         if(name==='validate') {const errors=C.validate(draft);notice(errors.length?errors.slice(0,6).join(' • '):'ผังเชื่อมทางเข้า–ช่องจอด–ทางออกครบ (ไม่ใช่การรับรองพื้นที่จริง)',!!errors.length);}
         if(name==='saveLayout'||name==='publish') {
@@ -210,10 +241,11 @@
     $('main').addEventListener('input',e=>{if(['filterFrom','filterTo','filterPlate'].includes(e.target.id)){const exportButton=$('main').querySelector('[data-action="export"]');if(exportButton)exportButton.disabled=true;}});
     $('main').addEventListener('dragover',e=>{if(tab==='editor'&&e.target.closest('.cell'))e.preventDefault();});
     $('main').addEventListener('drop',e=>{const cell=e.target.closest('.cell');if(!cell||tab!=='editor')return;e.preventDefault();safely(()=>{const data=JSON.parse(e.dataTransfer.getData('text/plain')),x=Number(cell.dataset.x),y=Number(cell.dataset.y);if(data.tool&&C.types[data.tool])putCell(x,y,data.tool);else if(data.id){if(draft.some(c=>c.floor===floor&&c.x===x&&c.y===y))throw new Error('ตำแหน่งนี้มีชิ้นส่วนแล้ว');if(!draft.some(c=>c.id===data.id))return;mutate(()=>{const c=draft.find(c=>c.id===data.id);c.x=x;c.y=y;c.floor=floor;selected=c.id;});}});});
-    $('nav').onclick=e=>{const b=e.target.closest('[data-nav]');if(!b||!checkDirty())return;tab=b.dataset.nav;loadDraft();showWorkspace();};
+    $('nav').onclick=e=>{const b=e.target.closest('[data-nav]');if(!b||!checkDirty())return;tab=b.dataset.nav;if(tab==='customers'){tenantScope='';acceptState(allState);}loadDraft();showWorkspace();};
+    $('backToCustomers').onclick=()=>{if(!checkDirty())return;tenantScope='';tab='customers';siteId='';acceptState(allState);loadDraft();showWorkspace();};
     $('sitePicker').onchange=e=>{if(!checkDirty()){e.target.value=siteId;return;}siteId=e.target.value;loadDraft();showWorkspace();};
-    $('refreshButton').onclick=()=>safely(async()=>{if(!checkDirty())return;if(!preview)state=await api('state');loadDraft();showWorkspace();notice('อัปเดตแล้ว');});
-    $('logoutButton').onclick=()=>safely(async()=>{if(!checkDirty())return;if(!preview)await api('logout',{});state=null;preview=false;dirty=false;$('workspace').hidden=true;$('loginScreen').hidden=false;});
+    $('refreshButton').onclick=()=>safely(async()=>{if(!checkDirty())return;if(!preview)acceptState(await api('state'));loadDraft();showWorkspace();notice('อัปเดตแล้ว');});
+    $('logoutButton').onclick=()=>safely(async()=>{if(!checkDirty())return;if(!preview)await api('logout',{});state=null;allState=null;tenantScope='';preview=false;tab='sites';siteId='';filters={from:'',to:'',plate:''};dirty=false;$('workspace').hidden=true;$('loginScreen').hidden=false;});
     const passwordButton=document.createElement('button');
     passwordButton.textContent='เปลี่ยนรหัสผ่าน';
     $('logoutButton').before(passwordButton);
@@ -228,9 +260,9 @@
     };
     $('cancelModal').onclick=()=>$('modal').close();
     $('modalForm').onsubmit=e=>{e.preventDefault();if(busy)return;safely(async()=>{await modalSubmit(new FormData(e.target));$('modal').close();showWorkspace();notice('บันทึกแล้ว');});};
-    $('loginForm').onsubmit=e=>{e.preventDefault();safely(async()=>{state=await api('login',Object.fromEntries(new FormData(e.target)));preview=false;siteId='';tab='sites';e.target.reset();loadDraft();showWorkspace();});};
-    $('previewButton').onclick=()=>{state=C.preview();preview=true;siteId=state.sites[0].id;tab='sites';loadDraft();showWorkspace();};
+    $('loginForm').onsubmit=e=>{e.preventDefault();safely(async()=>{tenantScope='';acceptState(await api('login',Object.fromEntries(new FormData(e.target))));preview=false;siteId='';tab='sites';e.target.reset();loadDraft();showWorkspace();});};
+    $('previewButton').onclick=()=>{acceptState(C.preview());preview=true;siteId=state.sites[0].id;tab='sites';loadDraft();showWorkspace();};
     window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
     if(location.hostname.endsWith('github.io'))$('connectionHint').textContent='GitHub Pages ไม่มี Java Backend หน้านี้จึงดูตัวอย่างได้เท่านั้น การบันทึกต้องรันเซิร์ฟเวอร์';
-    else api('state').then(data=>{state=data;showWorkspace();loadDraft();}).catch(()=>{});
+    else api('state').then(data=>{acceptState(data);showWorkspace();loadDraft();}).catch(()=>{});
 })();

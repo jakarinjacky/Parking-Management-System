@@ -18,8 +18,10 @@ class Client:
         self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
         self.state = None
 
-    def request(self, path, body=None, expected=200, origin=None, authorization=None):
+    def request(self, path, body=None, expected=200, origin=None, authorization=None, workspace=None):
         headers = {'Content-Type': 'application/json'}
+        if workspace is not None:
+            headers['X-Workspace-Tenant'] = workspace
         if authorization:
             headers['Authorization'] = authorization
         if origin:
@@ -76,10 +78,32 @@ with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
         assert len(owner.state['sites']) == 3
         assert len(other.state['sites']) == 1
         assert len(staff.state['sites']) == 1
+        # Workspace selectors never expand a customer's server-side permissions.
+        for client in [owner, other, admin, staff]:
+            own=client.state['user']['tenantId']
+            foreign='DEMO-B' if own=='DEMO-A' else 'DEMO-A'
+            client.request('state', expected=403, workspace=foreign)
+            scoped=client.request('state', workspace=own)
+            assert all(t['id']==own for t in scoped['tenants'])
+            for key in ['sites','users','audit']:
+                assert all(row['tenantId']==own for row in scoped[key]), key
+            assert all(u['role']!='super_admin' for u in scoped['users'])
+        scoped=superuser.request('state',workspace='DEMO-A')
+        assert len(scoped['tenants'])==1 and len(scoped['sites'])==3
+        assert all(u['tenantId']=='DEMO-A' for u in scoped['users'])
+        superuser.request('state')
+        foreign_user=other.state['user']['id']
+        owner.command('setUserActive',expected=403,userId=foreign_user,active=False)
+        owner.command('revokeSessions',expected=403,userId=foreign_user)
         site = owner.state['sites'][0]
         sid = site['id']
         assert 'hash' not in json.dumps(owner.state) and 'salt' not in json.dumps(owner.state)
         other.command('configure', expected=403, siteId=sid)
+        for action in ['checkin','checkout','saveLayout','addMember','reserve','addDevice']:
+            other.command(action,expected=403,siteId=sid)
+        owner.command('createUser',expected=403,username='escalate',password='LongPassword123!',role='super_admin',siteIds=[sid])
+        foreign_site=other.state['sites'][0]['id']
+        owner.command('createUser',expected=403,username='crosssite',password='LongPassword123!',role='staff',siteIds=[foreign_site])
         staff.command('saveLayout', expected=403, siteId=sid, cells=site['draft'])
         admin.command('publish', expected=403, siteId=sid)
         owner.command('publish', siteId=sid)

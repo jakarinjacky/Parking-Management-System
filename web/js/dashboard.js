@@ -6,6 +6,7 @@
   const date = value => value ? new Date(value).toLocaleString('th-TH') : '—';
   const baht = value => Number(value || 0).toLocaleString('th-TH',{style:'currency',currency:'THB'});
   const isPages = location.hostname.endsWith('github.io');
+  const workspaceTenant=new URLSearchParams(location.search).get('tenant')||'';
   let state, siteId = '', floor = 1, tab = 'map', saving = false;
   const site = () => state?.sites.find(item => item.id === siteId);
   function notice(message, error = false) {
@@ -13,7 +14,7 @@
     $('notice').classList.toggle('error', error);
   }
   async function api(path, data) {
-    const response = await fetch(`/api/platform/${path}`, {method:data === undefined ? 'GET' : 'POST',credentials:'same-origin',headers:data === undefined ? {} : {'Content-Type':'application/json'},body:data === undefined ? undefined : JSON.stringify(data)});
+    const response = await fetch(`/api/platform/${path}`, {method:data === undefined ? 'GET' : 'POST',credentials:'same-origin',headers:{...(data===undefined?{}:{'Content-Type':'application/json'}),...(workspaceTenant?{'X-Workspace-Tenant':workspaceTenant}:{})},body:data === undefined ? undefined : JSON.stringify(data)});
     const result = await response.json();
     if (!response.ok) {
       if (response.status === 401) showLogin();
@@ -28,10 +29,13 @@
     return (site()?.published || []).filter(cell => cell.type === 'SLOT' && !taken.has(cell.id) && (!type || window.PlatformCore.compatible(type, cell.slotType)));
   }
   async function refresh(preferred = siteId) {
-    const next = await api('state'); state = next;
+    const next = await api('state');
+    if(next.user.role==='super_admin'&&!workspaceTenant){location.replace('platform.html');return;}
+    state = next;
+    document.querySelectorAll('a[href^="platform.html"]').forEach(a=>a.href=next.user.role==='super_admin'&&workspaceTenant?`platform.html?tenant=${encodeURIComponent(workspaceTenant)}`:'platform.html');
     siteId = next.sites.some(item => item.id === preferred) ? preferred : (next.sites[0]?.id || '');
     $('loginPanel').hidden = true; $('workspace').hidden = false; $('identity').hidden = false;
-    $('account').textContent = `${next.user.username} · ${{super_admin:'เจ้าของแพลตฟอร์ม',owner:'เจ้าของ',admin:'ผู้ดูแล',staff:'พนักงาน'}[next.user.role] || next.user.role}`;
+    $('account').textContent = `${next.tenants[0]?.name || ''} · ${next.user.username} · ${{super_admin:'เจ้าของแพลตฟอร์ม',owner:'เจ้าของ',admin:'ผู้ดูแล',staff:'พนักงาน'}[next.user.role] || next.user.role}`;
     render();
   }
   function render() {
@@ -75,7 +79,8 @@
   async function guarded(fn) { if (saving) return; saving = true; try { await fn(); } catch(error) { notice(error.message, true); } finally { saving = false; } }
   async function command(action, values) {
     try {
-      state = await api('command',{action,siteId,revision:state.revision,...values});
+      await api('command',{action,siteId,revision:state.revision,...values});
+      await refresh();
     } catch(error) {
       if (error.message.includes('รีเฟรช')) await refresh();
       throw error;
