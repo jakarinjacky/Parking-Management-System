@@ -22,7 +22,7 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await page.locator('#loginForm [name=password]').fill('DemoPass123!');
   await page.locator('#loginForm button').click();
   await page.locator('#workspace').waitFor({state:'visible'});
-  await page.screenshot({path:path.join(tmp,'platform-desktop.png'),fullPage:true});
+  await page.screenshot({animations:'disabled',path:path.join(tmp,'platform-desktop.png'),fullPage:true});
   await page.locator('[data-action=editSite]').first().click();
   await page.locator('[data-action=publish]').click();
   await page.locator('#notice').filter({hasText:'เผยแพร่ผังแล้ว'}).waitFor();
@@ -40,7 +40,7 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   assert((await page.locator('.brand-title').innerText()).includes('Smart Parking System'));
   assert((await page.locator('#displayBoardMessage').innerText()).includes('ว่าง'));
   const tab=async name=>page.locator(`.tab-btn[onclick="switchTab('${name}')"]`).click();
-  await page.screenshot({path:path.join(tmp,'dashboard-reference-desktop.png'),fullPage:true});
+  await page.screenshot({animations:'disabled',path:path.join(tmp,'dashboard-reference-desktop.png'),fullPage:true});
   await page.locator('[data-slot=A6]').click();
   await page.locator('[data-park=A6]').click();
   await page.locator('#licensePlate').fill('UI-ENTRY');
@@ -92,8 +92,12 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await (await liveDownload).saveAs(path.join(tmp,'live-history.xlsx'));
   await page.setViewportSize({width:390,height:844});
   await tab('lot-view');
-  await page.screenshot({path:path.join(tmp,'dashboard-reference-mobile.png'),fullPage:true});
+  await page.screenshot({animations:'disabled',path:path.join(tmp,'dashboard-reference-mobile.png'),fullPage:true});
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  for(const mobileTab of ['entry-gate','exit-cashier','reservations','memberships','dashboard','ai-ops','oop-docs']){
+    await tab(mobileTab);
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`mobile overflow: ${mobileTab}`);
+  }
   await page.setViewportSize({width:1440,height:1000});
   await page.goto('http://localhost:8080/platform.html');
   await page.locator('#workspace').waitFor({state:'visible'});
@@ -115,7 +119,7 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   }
   await page.locator('[data-action=publish]').click();
   await page.locator('#notice').filter({hasText:'เผยแพร่ผังแล้ว'}).waitFor();
-  await page.screenshot({path:path.join(tmp,'platform-editor.png'),fullPage:true});
+  await page.screenshot({animations:'disabled',path:path.join(tmp,'platform-editor.png'),fullPage:true});
   for(const nav of ['members','devices','settings','users','audit'])await page.locator(`[data-nav=${nav}]`).click();
   await page.locator('[data-nav=settings]').click();
   await page.locator('[data-action=pricing]').click();
@@ -134,7 +138,7 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await page.setViewportSize({width:390,height:844});
   await page.locator('[data-nav=sites]').click();
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-  await page.screenshot({path:path.join(tmp,'platform-mobile.png'),fullPage:true});
+  await page.screenshot({animations:'disabled',path:path.join(tmp,'platform-mobile.png'),fullPage:true});
   await page.locator('#logoutButton').click();
   await page.locator('#loginScreen').waitFor({state:'visible'});
   await page.locator('#loginForm [name=username]').fill('staff');
