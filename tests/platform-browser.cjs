@@ -124,14 +124,14 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   assert((await page.locator('#ticketsTableBody').innerText()).includes('BROWSER-01'));
   await tab('memberships');
   for(const [id,value]of Object.entries({memberId:'DASH-001',memberName:'Dashboard member',memberPlate:'DASH-MEMBER',memberRoom:'D101',memberFrom:'2026-01-01',memberUntil:'2030-12-31'}))await page.locator('#'+id).fill(value);
-  await page.locator('form[onsubmit="createMembership(event)"] button').click();
+  await page.locator('#tab-memberships form button').click();
   await page.locator('#membershipsList').getByText('Dashboard member',{exact:false}).waitFor();
   await tab('reservations');
   await page.locator('#reservationPlate').fill('DASH-BOOKING');
   await page.locator('#reservationSlot').selectOption('A4');
   await page.locator('#reservationStart').fill('2030-12-01T10:00');
   await page.locator('#reservationEnd').fill('2030-12-01T11:00');
-  await page.locator('form[onsubmit="createReservation(event)"] button').click();
+  await page.locator('#tab-reservations form button').click();
   await page.locator('#reservationsList').getByText('DASH-BOOKING').waitFor();
   await page.locator('[data-cancel]').click();
   await page.locator('#reservationsList').getByText('CANCELLED').waitFor();
