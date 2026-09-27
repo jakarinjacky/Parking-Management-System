@@ -3,3 +3,7 @@
 @media(max-width:1000px){.workspace{grid-template-columns:175px 1fr}main{padding:24px}.sidebar{padding:22px 12px}.metrics{grid-template-columns:repeat(2,1fr)}header{padding:18px 24px}.account{flex-wrap:wrap}.editor{grid-template-columns:145px minmax(0,1fr)}.login-shell{gap:40px;padding:30px}.split{grid-template-columns:1fr}}
 @media(max-width:700px){.login-shell{grid-template-columns:1fr;padding:24px}.intro h1{font-size:36px}.mini-map{display:none}.intro .eyebrow{margin-bottom:18px}.workspace{display:block}.sidebar{padding:16px;border-right:0;border-bottom:1px solid var(--line);gap:18px}.brand{font-size:18px}.sidebar-foot{display:none}.nav{display:flex;overflow:auto}.nav button{white-space:nowrap}header{padding:16px;flex-wrap:wrap}.account{width:100%;justify-content:space-between}header select{min-width:0;max-width:85vw}.mode-banner{padding:10px 16px}main{padding:20px 16px}.page-title{align-items:start;flex-direction:column}.editor{grid-template-columns:1fr}.tools{display:flex;flex-wrap:wrap}.tools button{padding:10px;font-size:12px}.form-grid{grid-template-columns:1fr}.metric{padding:16px}.metric strong{font-size:27px}.login-card{padding:24px}input,select{font-size:16px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* Keep the active customer visible while switching between business tools. */
+#tenantContext { display:block; margin:4px 0; font-size:0.95rem; }
+#backToCustomers { margin:4px 0; }

@@ -75,7 +75,10 @@ public final class PlatformHandler implements HttpHandler {
             Object result=service.atomic(()->{
                 try { if(session.version()!=service.sessionVersion(session.userId())) throw new SessionExpired(); }
                 catch(SecurityException e) { sessions.remove(token); throw new SessionExpired(); }
-                if(path.equals("/api/platform/state")&&method.equals("GET")) return service.view(session.userId());
+                if(path.equals("/api/platform/state")&&method.equals("GET")) {
+                    String workspace=exchange.getRequestHeaders().getFirst("X-Workspace-Tenant");
+                    return workspace==null?service.view(session.userId()):service.workspace(session.userId(),workspace);
+                }
                 if(path.equals("/api/platform/command")&&write) return service.command(session.userId(),request);
                 return null;
             });
