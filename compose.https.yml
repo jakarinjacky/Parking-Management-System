@@ -4,11 +4,13 @@ services:
     restart: unless-stopped
     environment:
       PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:?set PLATFORM_DOMAIN to your domain}
+      ZEROSSL_EAB_KID: ${ZEROSSL_EAB_KID:-}
+      ZEROSSL_EAB_HMAC_KEY: ${ZEROSSL_EAB_HMAC_KEY:-}
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${CADDY_CONFIG:-./ops/Caddyfile}:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     networks: [parking]
