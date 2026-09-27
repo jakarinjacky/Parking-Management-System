@@ -10,7 +10,7 @@ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'platform-browser-'));
 fs.symlinkSync(path.resolve('web'),path.join(tmp,'web'),'dir');
 const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{...process.env,PLATFORM_DEMO:'true',PLATFORM_DATA_DIR:path.join(tmp,'platform')},stdio:'ignore'});
 (async()=>{
- let browser;
+ let browser, onboardingServer;
  try {
   for(let i=0;i<100;i++){try{const r=await fetch('http://localhost:8080/api/platform/state');if(r.status===401)break;}catch{}await new Promise(r=>setTimeout(r,100));}
   browser=await chromium.launch({headless:true});
@@ -106,7 +106,28 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await page.locator('#loginForm button').click();
   await page.locator('#workspace').waitFor({state:'visible'});
   assert.deepEqual(errors,[]);
+  const onboardingDir=path.join(tmp,'production-onboarding');
+  fs.mkdirSync(onboardingDir); fs.symlinkSync(path.resolve('web'),path.join(onboardingDir,'web'),'dir');
+  onboardingServer=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:onboardingDir,env:{...process.env,PORT:'8081',PLATFORM_ONLY:'true',PLATFORM_DEMO:'false',PLATFORM_ADMIN_PASSWORD:'SandboxPassword123!',PLATFORM_DATA_DIR:path.join(onboardingDir,'platform')},stdio:'ignore'});
+  for(let i=0;i<100;i++){try{const r=await fetch('http://localhost:8081/api/platform/health');if(r.ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
+  const onboarding=await browser.newPage(); onboarding.on('dialog',dialog=>dialog.accept());
+  await onboarding.goto('http://localhost:8081/');
+  assert(onboarding.url().endsWith('/dashboard.html'));
+  await onboarding.goto('http://localhost:8081/platform.html');
+  await onboarding.locator('#loginForm [name=username]').fill('superadmin');
+  await onboarding.locator('#loginForm [name=password]').fill('SandboxPassword123!');
+  await onboarding.locator('#loginForm button').click();
+  await onboarding.locator('[data-action=sampleWorkspace]').waitFor();
+  await onboarding.locator('[data-action=sampleWorkspace]').click();
+  await onboarding.locator('#main .grid').waitFor();
+  assert.equal(await onboarding.locator('#main .cell.SLOT').count(),20);
+  await onboarding.locator('#floorPicker').selectOption('2');
+  assert.equal(await onboarding.locator('#main .cell.SLOT').count(),20);
+  await onboarding.locator('[data-nav=sites]').click();
+  assert.equal(await onboarding.locator('.cards .card').count(),3);
+  await onboarding.locator('[data-nav=history]').click();
+  assert((await onboarding.locator('#main').innerText()).includes('ตัวอย่าง-'));
   console.log('Browser PASS: shared dashboard session/ledger, parking, cash checkout, XLSX, custom road layout, all tabs, mobile, staff permissions');
   console.log('QA artifacts: '+tmp);
- } finally {if(browser)await browser.close();server.kill('SIGTERM');}
+ } finally {if(browser)await browser.close();server.kill('SIGTERM');if(onboardingServer)onboardingServer.kill('SIGTERM');}
 })().catch(e=>{console.error(e);process.exitCode=1;});

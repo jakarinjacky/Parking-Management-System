@@ -246,6 +246,16 @@ public final class PlatformService {
             } else if(action.equals("createTenant")) {
                 require(superUser(u)); tenant=id(); addTenant(tenant,string(request,"name"),"trial");
                 addUser(string(request,"username"),string(request,"password"),"owner",tenant,List.of());
+            } else if(action.equals("createSampleWorkspace")) {
+                require(superUser(u));
+                var existing=list(state,"tenants").stream().filter(t->Boolean.TRUE.equals(t.get("sample"))).findFirst().orElse(null);
+                if(existing!=null) throw new IllegalArgumentException("พื้นที่ทดลองมีอยู่แล้ว กรุณาเลือกลานตัวอย่างจากรายการ");
+                tenant=id(); addTenant(tenant,"GreenPark • พื้นที่ทดลอง", "trial");
+                list(state,"tenants").get(list(state,"tenants").size()-1).put("sample",true);
+                for(var spec:List.of(new String[]{"Green Residence • ตัวอย่าง","CONDO"},new String[]{"Green Avenue Mall • ตัวอย่าง","MALL"},new String[]{"Grey Garden Hotel • ตัวอย่าง","HOTEL"})) {
+                    var example=createSite(tenant,spec[0],spec[1]); example.put("sample",true);
+                    example.put("draft",ParkingLayout.sampleLayout(spec[1])); seedHistory(example);
+                }
             } else if(action.equals("createSite")) {
                 require(owner(u)); if(superUser(u)) tenant=string(request,"tenantId");
                 final String target=tenant;
