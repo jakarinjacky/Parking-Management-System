@@ -180,7 +180,6 @@ public final class PlatformService {
         List<Map<String,Object>> sites=new ArrayList<>();
         for(var site:list(state,"sites")) if(access(u,site)) {
             var copy=map(Json.parse(SimpleJson.toJson(site)));
-            copy.put("clockTime",siteTime(site).toString());
             copy.put("devices",list(site,"devices").stream().map(DeviceGateway::publicView).toList());
             list(copy,"tickets").removeIf(t->!t.get("status").equals("ACTIVE")&&t.get("exitTime").toString().compareTo(cutoff)<0);
             if(u.get("role").equals("staff")) {

@@ -158,7 +158,7 @@ const types={CAR:'รถยนต์ทั่วไป',ELECTRIC_VEHICLE:'รถ
 let state,siteId='',tab='lot-view',busy=false,preferred='',heat=false,quote=null,receipt=null,loadedAt=Date.now(),noticeTimer;
 const site=()=>state?.sites.find(s=>s.id===siteId), active=()=>site()?.tickets.filter(t=>t.status==='ACTIVE')||[];
 const cells=()=>site()?.published.filter(c=>c.type==='SLOT')||[];
-const clock=()=>site()?.clockTime?new Date(site().clockTime).getTime()+Date.now()-loadedAt:Date.now();
+const clock=()=>Date.now()+(site()?.sample?Number(site().simulationMinutes||0)*60000:0);
 const can=id=>!!state&&(state.user.role!=='staff'||['lot-view','entry-gate','exit-cashier'].includes(id));
 function notice(text,error=false){$('notice').textContent=text;$('notice').hidden=false;$('notice').classList.toggle('error',error);clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>$('notice').hidden=true,8000);}
 async function api(path,data){const r=await fetch(`/api/platform/${path}`,{method:data===undefined?'GET':'POST',credentials:'same-origin',headers:{...(data===undefined?{}:{'Content-Type':'application/json'}),...(tenant?{'X-Workspace-Tenant':tenant}:{})},body:data===undefined?undefined:JSON.stringify(data)});let v;try{v=await r.json();}catch{throw Error('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ');}if(!r.ok){if(r.status===401)showLogin();throw Error(v.error||'ทำรายการไม่สำเร็จ');}return v;}
@@ -222,7 +222,7 @@ function answer(q){const s=site();if(/รายได้|เงิน/.test(q))r
 function appendChat(id,who,text){const el=document.createElement('div');el.className='chat-bubble '+who;el.textContent=text;$(id).append(el);$(id).scrollTop=$(id).scrollHeight;}
 async function chat(id,text){if(!can('ai-ops')||!text.trim())return;appendChat(id,'user',text.slice(0,500));try{await refresh();appendChat(id,'ai',answer(text));}catch(e){appendChat(id,'ai','โหลดข้อมูลล่าสุดไม่ได้: '+e.message);}}
 function resetContext(){quote=null;receipt=null;preferred='';heat=false;appState.currentFeePreview=null;appState.selectedFloor=1;$('feeResultCard').style.display='none';document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));for(const id of ['aiCopilotChatLog','floatingChatLog'])$(id).replaceChildren();for(const id of ['historyFrom','historyTo','historyPlate','exitSearchQuery','paymentReference'])$(id).value='';window.setHistoryExportRecords?.([]);}
-Object.assign(window,{switchTab,updateVehicleSelection,requestAiRecommendation,triggerAiAnprScan,randomizePlate,handleCheckIn,searchTicketForExit,submitPayment,finishPaymentAndOpenExitGate,handleLostTicket,showSlotDetails,createReservation,createMembership,toggleAiHeatmap,loadAiPredictiveData,
+Object.assign(window,{debounceAiRecommend:requestAiRecommendation,switchTab,updateVehicleSelection,requestAiRecommendation,triggerAiAnprScan,randomizePlate,handleCheckIn,searchTicketForExit,submitPayment,finishPaymentAndOpenExitGate,handleLostTicket,showSlotDetails,createReservation,createMembership,toggleAiHeatmap,loadAiPredictiveData,
 loadSystemStatus:()=>guarded(refresh),loadParkingLotData:()=>guarded(refresh),loadTicketsAndPayments:()=>guarded(refresh),loadFeatureLists:()=>guarded(refresh),loadDailyDashboard:()=>guarded(refresh),
 loadParkingHistory:()=>guarded(async()=>{if($('historyFrom').value&&$('historyTo').value&&$('historyFrom').value>$('historyTo').value)throw Error('วันที่เริ่มต้องไม่เกินวันที่สิ้นสุด');await refresh();}),
 fastForward:minutes=>guarded(()=>command('sampleTime',{minutes})),resetSimTime:()=>guarded(()=>command('sampleTime',{minutes:0,reset:true})),
