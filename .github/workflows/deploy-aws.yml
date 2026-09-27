@@ -98,12 +98,13 @@ jobs:
             rm -f /tmp/parking-platform.tar.gz /tmp/parking-platform.env'
 
       - name: Verify health
+        timeout-minutes: 5
         env:
           AWS_HOST: ${{ secrets.AWS_HOST }}
           PLATFORM_DOMAIN: ${{ vars.PLATFORM_DOMAIN }}
         run: |
           if test -n "$PLATFORM_DOMAIN"; then
-            curl --fail --retry 12 --retry-delay 5 "https://$PLATFORM_DOMAIN/api/platform/health"
+            curl --fail --show-error --silent --connect-timeout 10 --max-time 20 --retry 24 --retry-all-errors --retry-delay 5 --retry-max-time 180 "https://$PLATFORM_DOMAIN/api/platform/health"
           else
-            curl --fail --retry 12 --retry-delay 5 "http://$AWS_HOST:8080/api/platform/health"
+            curl --fail --show-error --silent --connect-timeout 10 --max-time 20 --retry 24 --retry-all-errors --retry-delay 5 --retry-max-time 180 "http://$AWS_HOST:8080/api/platform/health"
           fi
