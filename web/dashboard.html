@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GreenPark | ศูนย์จัดการลานจอด</title>
+  <link rel="stylesheet" href="css/dashboard.css">
+  <script src="js/platform-core.js" defer></script>
+  <script src="js/history-export.js" defer></script>
+  <script src="js/dashboard.js" defer></script>
+</head>
+<body>
+  <header class="top"><a class="brand" href="/dashboard.html"><span>G</span><strong>GreenPark<small>Parking operations</small></strong></a><div id="identity" hidden><span id="account"></span><button id="refresh" type="button">รีเฟรช</button><button id="logout" type="button">ออกจากระบบ</button></div></header>
+  <div id="notice" role="status" aria-live="polite" hidden></div>
+  <main>
+    <section id="loginPanel" class="login"><div><span class="eyebrow">GREENPARK / LIVE WORKSPACE</span><h1>ลานจอดของคุณ<br>อยู่ในที่เดียว<span>.</span></h1><p>รับรถ ดูพื้นที่ว่าง และตรวจประวัติจากฐานข้อมูลเดียวกับแพลตฟอร์มออกแบบลานจอด</p></div><form id="loginForm" class="card"><h2>เข้าสู่ระบบ</h2><label>ชื่อผู้ใช้<input name="username" autocomplete="username" required></label><label>รหัสผ่าน<input name="password" type="password" autocomplete="current-password" required></label><button class="primary">เข้าสู่ระบบ</button><p>ใช้บัญชีเจ้าของ ผู้ดูแล หรือพนักงานของ GreenPark Platform</p></form></section>
+    <section id="workspace" hidden>
+      <div class="heading"><div><span class="eyebrow">OPERATIONS / LIVE</span><h1>ภาพรวมลานจอด</h1><p>รายการในหน้านี้บันทึกลงระบบแพลตฟอร์มเดียวกัน</p></div><div class="head-actions"><label>เลือกลานจอด<select id="sitePicker"></select></label><a class="button" href="/platform.html">จัดการแพลตฟอร์มและผัง →</a></div></div>
+      <div class="metrics"><article><span>ช่องทั้งหมด</span><strong id="total">0</strong></article><article><span>ว่าง</span><strong id="available">0</strong></article><article><span>รถที่จอดอยู่</span><strong id="occupied">0</strong></article><article><span>รถออกในประวัติ 3 เดือน</span><strong id="departed">0</strong></article></div>
+      <nav class="tabs" aria-label="ส่วนงาน"><button data-tab="map" class="selected">ผังและสถานะ</button><button data-tab="entry">รถเข้า</button><button data-tab="exit">รถออก</button><button data-tab="history">ประวัติย้อนหลัง</button></nav>
+      <section id="viewMap" class="card view"><div class="section-heading"><div><h2>ผังช่องจอดที่เผยแพร่</h2><p>สถานะตรงกับรายการรถที่ใช้งานอยู่</p></div><label>ชั้น<select id="floorPicker"></select></label></div><div id="slotMap" class="slot-map"></div></section>
+      <section id="viewEntry" class="card view" hidden><h2>รับรถเข้าลาน</h2><p>เลือกรถและช่องที่รองรับ ระบบตรวจสิทธิ์สมาชิก การจอง และโควตาอีกครั้งก่อนบันทึก</p><form id="entryForm" class="form-grid"><label>ทะเบียนรถ<input name="plate" required maxlength="30"></label><label>ประเภทรถ<select name="vehicleType"><option value="CAR">รถยนต์</option><option value="ELECTRIC_VEHICLE">EV</option><option value="MOTORCYCLE">มอเตอร์ไซค์</option><option value="TRUCK">รถขนาดใหญ่</option></select></label><label>ช่องว่าง<select name="slotId" required></select></label><button class="primary">บันทึกรถเข้า</button></form></section>
+      <section id="viewExit" class="card view" hidden><h2>รถที่จอดอยู่</h2><p>ยืนยันรับเงินสดก่อนกดรถออก ระบบคำนวณยอดจริง ณ เวลาบันทึก</p><div id="activeTickets" class="table-wrap"></div></section>
+      <section id="viewHistory" class="card view" hidden><div class="section-heading"><div><h2>ประวัติรถเข้าออก</h2><p id="historyNote">เก็บย้อนหลัง 3 เดือน</p></div><button id="exportButton" type="button">ส่งออก Excel</button></div><div class="filters"><label>จากวันที่<input type="date" id="fromDate"></label><label>ถึงวันที่<input type="date" id="toDate"></label><label>ค้นทะเบียน<input id="plateFilter" placeholder="ทะเบียนรถ"></label></div><div id="historyTable" class="table-wrap"></div></section>
+    </section>
+  </main>
+  <div hidden><input id="historyFrom"><input id="historyTo"><input id="historyPlate"><span id="historyExportMessage"></span></div>
+</body>
+</html>

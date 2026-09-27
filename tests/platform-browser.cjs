@@ -33,10 +33,16 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await page.locator('#modal button[type=submit]').click();
   await page.locator('#modal').waitFor({state:'hidden'});
   assert(await page.locator('tbody').innerText().then(t=>t.includes('BROWSER-01')));
-  await page.locator('[data-action=checkout]').click();
-  await page.locator('#modal input[type=checkbox]').check();
-  await page.locator('#modal button[type=submit]').click();
-  await page.locator('#modal').waitFor({state:'hidden'});
+  // The main dashboard shares this session, site state, and ledger with the editor.
+  await page.goto('http://localhost:8080/dashboard.html');
+  await page.locator('#workspace').waitFor({state:'visible'});
+  assert(await page.locator('#slotMap').innerText().then(t=>t.includes('BROWSER-01')));
+  await page.locator('[data-tab=exit]').click();
+  await page.locator('[data-exit]').click();
+  await page.locator('#notice').filter({hasText:'บันทึกรถออกแล้ว'}).waitFor();
+  await page.goto('http://localhost:8080/platform.html');
+  await page.locator('#workspace').waitFor({state:'visible'});
+  await page.locator('[data-action=openSite]').first().click();
   await page.locator('[data-nav=history]').click();
   const downloading=page.waitForEvent('download');
   await page.locator('[data-action=export]').click();
@@ -82,6 +88,13 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await page.locator('#workspace').waitFor({state:'visible'});
   assert.equal(await page.locator('[data-nav=editor]').count(),0);
   assert.equal(await page.locator('[data-nav=history]').count(),0);
+  await page.goto('http://localhost:8080/dashboard.html');
+  await page.locator('#workspace').waitFor({state:'visible'});
+  assert.equal(await page.locator('#sitePicker option').count(),1);
+  await page.locator('[data-tab=history]').click();
+  assert.equal(await page.locator('#exportButton').isVisible(),false);
+  await page.goto('http://localhost:8080/platform.html');
+  await page.locator('#workspace').waitFor({state:'visible'});
   await page.getByRole('button',{name:'เปลี่ยนรหัสผ่าน',exact:true}).click();
   await page.locator('#modal [name=currentPassword]').fill('DemoPass123!');
   await page.locator('#modal [name=newPassword]').fill('BrowserPassword123!');
@@ -93,7 +106,7 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await page.locator('#loginForm button').click();
   await page.locator('#workspace').waitFor({state:'visible'});
   assert.deepEqual(errors,[]);
-  console.log('Browser PASS: login, publish, parking, cash checkout, XLSX, custom road layout, all tabs, mobile, staff permissions');
+  console.log('Browser PASS: shared dashboard session/ledger, parking, cash checkout, XLSX, custom road layout, all tabs, mobile, staff permissions');
   console.log('QA artifacts: '+tmp);
  } finally {if(browser)await browser.close();server.kill('SIGTERM');}
 })().catch(e=>{console.error(e);process.exitCode=1;});
