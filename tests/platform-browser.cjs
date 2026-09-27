@@ -20,6 +20,12 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   page.on('pageerror',e=>errors.push(e.message));
   page.on('dialog',d=>d.accept());
   await page.goto('http://localhost:8080/platform.html');
+  const securityResponse = await page.request.get('http://localhost:8080/platform.html');
+  assert(securityResponse.headers()['content-security-policy'].includes("script-src 'self'"));
+  assert.equal(securityResponse.headers()['x-frame-options'],'DENY');
+  await page.evaluate(() => { const script=document.createElement('script');script.textContent='window.injectedCodeRan=true';document.body.append(script); });
+  assert.equal(await page.evaluate(()=>window.injectedCodeRan),undefined,'CSP must block inline injected code');
+
   await page.screenshot({animations:'disabled',path:path.join(tmp,'studio-login-desktop.png'),fullPage:true});
   await page.locator('.pricing-cta').filter({hasText:'Business'}).click();
   await page.locator('[data-demo-contact="LINE"]').click();
@@ -93,7 +99,7 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   assert((await page.locator('#slotsGrid').innerText()).includes('BROWSER-01'));
   assert((await page.locator('.brand-title').innerText()).includes('Smart Parking System'));
   assert((await page.locator('#displayBoardMessage').innerText()).includes('ว่าง'));
-  const tab=async name=>page.locator(`.tab-btn[onclick="switchTab('${name}')"]`).click();
+  const tab=async name=>page.locator(`.tab-btn[data-handler="switchTab('${name}')"]`).click();
   await page.screenshot({animations:'disabled',path:path.join(tmp,'dashboard-reference-desktop.png'),fullPage:true});
   await page.locator('[data-slot=A6]').click();
   await page.locator('[data-park=A6]').click();
@@ -106,13 +112,13 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   assert((await page.locator('#slotsGrid').innerText()).includes('UI-ENTRY'));
   await tab('exit-cashier');
   await page.locator('#exitSearchQuery').fill('BROWSER-01');
-  await page.locator('button[onclick="searchTicketForExit()"] ').click();
+  await page.locator('button[data-handler="searchTicketForExit()"] ').click();
   await page.locator('#feeResultCard').waitFor({state:'visible'});
   await page.locator('#paymentConfirmed').check();
-  await page.locator('button[onclick="submitPayment()"] ').click();
+  await page.locator('button[data-handler="submitPayment()"] ').click();
   await page.locator('#receiptModalOverlay.active').waitFor();
   assert((await page.locator('#rcpPlate').innerText()).includes('BROWSER-01'));
-  await page.locator('button[onclick="finishPaymentAndOpenExitGate()"] ').click();
+  await page.locator('button[data-handler="finishPaymentAndOpenExitGate()"] ').click();
   await page.locator('#notice').filter({hasText:'บันทึกรถออกแล้ว'}).waitFor();
   await tab('tickets-history');
   assert((await page.locator('#ticketsTableBody').innerText()).includes('BROWSER-01'));
@@ -133,7 +139,7 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   assert((await page.locator('#dashboardMessage').innerText()).includes('รับชำระ 1'));
   await tab('ai-ops');
   await page.locator('#copilotInputText').fill('มีที่จอดว่างชั้นไหน');
-  await page.locator('button[onclick="submitCopilotChat()"] ').click();
+  await page.locator('button[data-handler="submitCopilotChat()"] ').click();
   await page.locator('#aiCopilotChatLog .chat-bubble.ai').filter({hasText:'ชั้น 1'}).waitFor();
   await tab('entry-gate');
   await page.locator('#licensePlate').fill('ANPR-TEST');
@@ -204,7 +210,7 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await page.goto('http://localhost:8080/dashboard.html');
   await page.locator('#workspace').waitFor({state:'visible'});
   assert.equal(await page.locator('#sitePicker option').count(),1);
-  assert.equal(await page.locator(".tab-btn[onclick=\"switchTab('vehicle-history')\"]").isVisible(),false);
+  assert.equal(await page.locator(".tab-btn[data-handler=\"switchTab('vehicle-history')\"]").isVisible(),false);
   assert.equal(await page.locator('#historyExportButton').isVisible(),false);
   await page.goto('http://localhost:8080/platform.html');
   await page.locator('#workspace').waitFor({state:'visible'});
@@ -366,7 +372,7 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await onboarding.locator('#workspace').waitFor({state:'visible'});
   await onboarding.locator('#startPresentation').click();
   await onboarding.locator('#presentationGuide').waitFor({state:'visible'});
-  const demoTab=async name=>onboarding.locator(`.tab-btn[onclick="switchTab('${name}')"]`).click();
+  const demoTab=async name=>onboarding.locator(`.tab-btn[data-handler="switchTab('${name}')"]`).click();
   await demoTab('entry-gate');
   await onboarding.locator('[name=vType][value=TRUCK]').check({force:true});
   await onboarding.evaluate(()=>updateVehicleSelection());
@@ -378,15 +384,15 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await onboarding.locator('#btnIssueTicket').click();
   await onboarding.locator('#ticketModalOverlay.active').waitFor();
   await onboarding.locator('#ticketModalOverlay .modal-close-btn').click();
-  await onboarding.locator('#clockController button[onclick="fastForward(60)"]').click();
+  await onboarding.locator('#clockController button[data-handler="fastForward(60)"]').click();
   await demoTab('exit-cashier');
   await onboarding.locator('#exitSearchQuery').fill(truckPlate);
-  await onboarding.locator('button[onclick="searchTicketForExit()"] ').click();
+  await onboarding.locator('button[data-handler="searchTicketForExit()"] ').click();
   await onboarding.locator('#feeResultCard').waitFor({state:'visible'});
   await onboarding.locator('#simulatePayment').click();
   await onboarding.locator('#receiptModalOverlay.active').waitFor();
   assert((await onboarding.locator('#receiptModalOverlay').innerText()).includes('SIMULATED_CASH'));
-  await onboarding.locator('button[onclick="finishPaymentAndOpenExitGate()"] ').click();
+  await onboarding.locator('button[data-handler="finishPaymentAndOpenExitGate()"] ').click();
   await onboarding.locator('#receiptModalOverlay').waitFor({state:'hidden'});
   await demoTab('lot-view');
   await onboarding.screenshot({animations:'disabled',path:path.join(tmp,'studio-dashboard-desktop.png'),fullPage:true});

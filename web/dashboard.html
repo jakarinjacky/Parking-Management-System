@@ -81,11 +81,11 @@
                     <span class="clock-time" id="simulatedTimeText">--:--:--</span>
                 </div>
                 <div class="time-actions">
-                    <button class="time-btn" onclick="fastForward(15)" title="เพิ่ม 15 นาที">+15m</button>
-                    <button class="time-btn" onclick="fastForward(60)" title="เพิ่ม 1 ชั่วโมง">+1h</button>
-                    <button class="time-btn" onclick="fastForward(180)" title="เพิ่ม 3 ชั่วโมง">+3h</button>
-                    <button class="time-btn" onclick="fastForward(1440)" title="เพิ่ม 1 วัน">+1d</button>
-                    <button class="time-btn btn-reset" onclick="resetSimTime()" title="รีเซ็ตเวลา">
+                    <button class="time-btn" data-safe-click="control-0" data-handler="fastForward(15)" title="เพิ่ม 15 นาที">+15m</button>
+                    <button class="time-btn" data-safe-click="control-1" data-handler="fastForward(60)" title="เพิ่ม 1 ชั่วโมง">+1h</button>
+                    <button class="time-btn" data-safe-click="control-2" data-handler="fastForward(180)" title="เพิ่ม 3 ชั่วโมง">+3h</button>
+                    <button class="time-btn" data-safe-click="control-3" data-handler="fastForward(1440)" title="เพิ่ม 1 วัน">+1d</button>
+                    <button class="time-btn btn-reset" data-safe-click="control-4" data-handler="resetSimTime()" title="รีเซ็ตเวลา">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                     </button>
                 </div>
@@ -111,7 +111,7 @@
             <div id="identity" class="session-status-panel"><span id="account" class="user-badge"></span><button id="logout" class="logout-btn" type="button">ออกจากระบบ</button></div>
         </header>
         <div class="live-workspace-picker"><label>ลานจอดของบริษัท <select id="sitePicker" class="form-input"></select></label><span id="companyContext"></span><span id="liveMode" class="mono-badge"></span><button id="startPresentation" class="btn-primary" hidden>▶ เปิดลานพรีเซนต์</button><button id="resetPresentation" class="btn-secondary" hidden>↻ เริ่มสาธิตใหม่</button></div>
-        <details id="presentationGuide" class="presentation-guide" hidden open><summary>DEMO STUDIO · เส้นทางพรีเซนต์ 5 นาที</summary><p>ข้อมูลสมมุติ บันทึกบนเซิร์ฟเวอร์ · ไม่รับเงินจริงและไม่เชื่อมอุปกรณ์จริง</p><div class="demo-steps"><button data-demo-tab="entry-gate"><b>01</b> สแกนทะเบียน → รับรถ</button><button onclick="fastForward(60)"><b>02</b> จำลองเวลา +1 ชม.</button><button data-demo-tab="exit-cashier"><b>03</b> จำลองชำระ → รถออก</button><button data-demo-tab="vehicle-history"><b>04</b> ประวัติ / Excel</button><button data-demo-tab="oop-docs"><b>05</b> อธิบาย OOP</button></div></details>
+        <details id="presentationGuide" class="presentation-guide" hidden open><summary>DEMO STUDIO · เส้นทางพรีเซนต์ 5 นาที</summary><p>ข้อมูลสมมุติ บันทึกบนเซิร์ฟเวอร์ · ไม่รับเงินจริงและไม่เชื่อมอุปกรณ์จริง</p><div class="demo-steps"><button data-demo-tab="entry-gate"><b>01</b> สแกนทะเบียน → รับรถ</button><button data-safe-click="control-5" data-handler="fastForward(60)"><b>02</b> จำลองเวลา +1 ชม.</button><button data-demo-tab="exit-cashier"><b>03</b> จำลองชำระ → รถออก</button><button data-demo-tab="vehicle-history"><b>04</b> ประวัติ / Excel</button><button data-demo-tab="oop-docs"><b>05</b> อธิบาย OOP</button></div></details>
 
         <!-- Live Gate Display Board Banner (Observer Pattern) -->
         <div class="display-board-banner">
@@ -125,36 +125,36 @@
 
         <!-- Navigation Tabs -->
         <nav class="main-tabs">
-            <button class="tab-btn active" onclick="switchTab('lot-view')">
+            <button class="tab-btn active" data-safe-click="control-6" data-handler="switchTab('lot-view')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
                 <span>แผนผังช่องจอด (2D Lot Map)</span>
             </button>
-            <button class="tab-btn" onclick="switchTab('entry-gate')">
+            <button class="tab-btn" data-safe-click="control-7" data-handler="switchTab('entry-gate')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                 <span>จุดตรวจทางเข้า (Entry Gate)</span>
             </button>
-            <button class="tab-btn" onclick="switchTab('exit-cashier')">
+            <button class="tab-btn" data-safe-click="control-8" data-handler="switchTab('exit-cashier')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
                 <span>จุดชำระเงิน & ทางออก (Exit & Pay)</span>
             </button>
-            <button class="tab-btn" onclick="switchTab('tickets-history')">
+            <button class="tab-btn" data-safe-click="control-9" data-handler="switchTab('tickets-history')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                 <span>ประวัติตั๋ว & บัญชี (Ledger)</span>
             </button>
-            <button class="tab-btn" onclick="switchTab('vehicle-history')">
+            <button class="tab-btn" data-safe-click="control-10" data-handler="switchTab('vehicle-history')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/><path d="M12 7v5l3 2"/></svg>
                 <span>ประวัติรถเข้าออก 3 เดือน</span>
             </button>
-            <button class="tab-btn" onclick="switchTab('reservations')">จองล่วงหน้า</button>
-            <button class="tab-btn" onclick="switchTab('memberships')">บัตรสมาชิก</button>
-            <button class="tab-btn" onclick="switchTab('dashboard')">
+            <button class="tab-btn" data-safe-click="control-11" data-handler="switchTab('reservations')">จองล่วงหน้า</button>
+            <button class="tab-btn" data-safe-click="control-12" data-handler="switchTab('memberships')">บัตรสมาชิก</button>
+            <button class="tab-btn" data-safe-click="control-13" data-handler="switchTab('dashboard')">
                 <span>Dashboard รายได้</span>
             </button>
-            <button class="tab-btn highlight-tab" onclick="switchTab('oop-docs')">
+            <button class="tab-btn highlight-tab" data-safe-click="control-14" data-handler="switchTab('oop-docs')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
                 <span>สถาปัตยกรรม OOP & SOLID</span>
             </button>
-            <button class="tab-btn ai-tab" onclick="switchTab('ai-ops')">
+            <button class="tab-btn ai-tab" data-safe-click="control-15" data-handler="switchTab('ai-ops')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3v1a4 4 0 0 1-4 4 4 4 0 0 1-4-4v-1a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="11" r="1"/><circle cx="15" cy="11" r="1"/><path d="M10 16h4"/></svg>
                 <span>🤖 ศูนย์ปฏิบัติการ AI & XAI</span>
             </button>
@@ -182,11 +182,11 @@
                     </div>
 
                     <div class="lot-actions-right">
-                        <button class="btn-ai-pill" id="btnToggleAiHeatmap" onclick="toggleAiHeatmap()">
+                        <button class="btn-ai-pill" id="btnToggleAiHeatmap" data-safe-click="control-16" data-handler="toggleAiHeatmap()">
                             <span class="ai-sparkle">✨</span>
                             <span id="aiHeatmapBtnText">เปิด AI Heatmap</span>
                         </button>
-                        <button class="btn-secondary" onclick="loadParkingLotData()">
+                        <button class="btn-secondary" data-safe-click="control-17" data-handler="loadParkingLotData()">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                             รีเฟรชผัง
                         </button>
@@ -243,11 +243,11 @@
                                 </div>
                             </div>
                             <div class="anpr-actions">
-                                <button type="button" class="btn-ai-scan" id="btnTriggerAnpr" onclick="triggerAiAnprScan()">
+                                <button type="button" class="btn-ai-scan" id="btnTriggerAnpr" data-safe-click="control-18" data-handler="triggerAiAnprScan()">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                                     <span>สแกนป้ายทะเบียน & จำแนกรถด้วย AI</span>
                                 </button>
-                                <button type="button" class="btn-ghost" onclick="randomizePlate()">สุ่มป้าย</button>
+                                <button type="button" class="btn-ghost" data-safe-click="control-19" data-handler="randomizePlate()">สุ่มป้าย</button>
                             </div>
                             <!-- AI Detection Feedback -->
                             <div class="anpr-result-box" id="anprResultBox" style="display: none;">
@@ -262,12 +262,12 @@
                         </div>
 
                         <p class="live-info">ภาพกล้องและไม้กั้นเป็นการจำลอง ส่วนตั๋วและรายการรับรถบันทึกในลานที่เลือก</p>
-                        <form id="checkInForm" onsubmit="handleCheckIn(event)">
+                        <form id="checkInForm" data-safe-submit="control-20">
                             <div class="form-group">
                                 <label for="licensePlate">เลขทะเบียนรถ <span class="required">*</span></label>
                                 <div class="input-with-action">
-                                    <input type="text" id="licensePlate" class="form-input" placeholder="เช่น 3กข-9876 กรุงเทพฯ" required maxlength="15" oninput="debounceAiRecommend()">
-                                    <button type="button" class="btn-ghost" onclick="randomizePlate()">สุ่มทะเบียน</button>
+                                    <input type="text" id="licensePlate" class="form-input" placeholder="เช่น 3กข-9876 กรุงเทพฯ" required maxlength="15" data-safe-input="control-21">
+                                    <button type="button" class="btn-ghost" data-safe-click="control-22" data-handler="randomizePlate()">สุ่มทะเบียน</button>
                                 </div>
                             </div>
 
@@ -275,25 +275,25 @@
                                 <label>ประเภทยานพาหนะ (Vehicle Type) <span class="required">*</span></label>
                                 <div class="vehicle-type-selector">
                                     <label class="type-card active">
-                                        <input type="radio" name="vType" value="CAR" checked onchange="updateVehicleSelection()">
+                                        <input type="radio" name="vType" value="CAR" checked data-safe-change="control-23">
                                         <span class="type-icon">🚗</span>
                                         <span class="type-name">รถยนต์ทั่วไป</span>
                                         <span class="type-sub">เก๋ง / SUV / Crossover</span>
                                     </label>
                                     <label class="type-card">
-                                        <input type="radio" name="vType" value="ELECTRIC_VEHICLE" onchange="updateVehicleSelection()">
+                                        <input type="radio" name="vType" value="ELECTRIC_VEHICLE" data-safe-change="control-24">
                                         <span class="type-icon">⚡</span>
                                         <span class="type-name">รถยนต์ไฟฟ้า (EV)</span>
                                         <span class="type-sub">ต้องการชาร์จไฟ</span>
                                     </label>
                                     <label class="type-card">
-                                        <input type="radio" name="vType" value="MOTORCYCLE" onchange="updateVehicleSelection()">
+                                        <input type="radio" name="vType" value="MOTORCYCLE" data-safe-change="control-25">
                                         <span class="type-icon">🏍️</span>
                                         <span class="type-name">มอเตอร์ไซค์</span>
                                         <span class="type-sub">บิ๊กไบค์ / สกู๊ตเตอร์</span>
                                     </label>
                                     <label class="type-card">
-                                        <input type="radio" name="vType" value="TRUCK" onchange="updateVehicleSelection()">
+                                        <input type="radio" name="vType" value="TRUCK" data-safe-change="control-26">
                                         <span class="type-icon">🚚</span>
                                         <span class="type-name">รถบรรทุก / รถตู้ใหญ่</span>
                                         <span class="type-sub">ช่องจอดขนาดพิเศษ</span>
@@ -303,7 +303,7 @@
 
                             <div class="form-group" id="evOptionGroup" style="display: none;">
                                 <label class="checkbox-container">
-                                    <input type="checkbox" id="requiresCharging" checked onchange="requestAiRecommendation()">
+                                    <input type="checkbox" id="requiresCharging" checked data-safe-change="control-27">
                                     <span class="checkmark"></span>
                                     <span>ต้องการเข้าจอดช่องที่มีแท่นชาร์จ EV (EV Charging Station)</span>
                                 </label>
@@ -389,8 +389,8 @@
 
                         <div class="search-ticket-bar">
                             <input type="text" id="exitSearchQuery" class="form-input" placeholder="พิมพ์เลขที่ตั๋ว เช่น TKT-... หรือ ป้ายทะเบียน">
-                            <button class="btn-primary" onclick="searchTicketForExit()">ค้นหา / สแกนตั๋ว</button>
-                            <button class="btn-danger-ghost" onclick="handleLostTicket()" title="กรณีทำบัตรหาย คิดค่าจอดตามเวลาจริง + ค่าปรับ 300฿">ตั๋วหาย</button>
+                            <button class="btn-primary" data-safe-click="control-28" data-handler="searchTicketForExit()">ค้นหา / สแกนตั๋ว</button>
+                            <button class="btn-danger-ghost" data-safe-click="control-29" data-handler="handleLostTicket()" title="กรณีทำบัตรหาย คิดค่าจอดตามเวลาจริง + ค่าปรับ 300฿">ตั๋วหาย</button>
                         </div>
 
                         <!-- Active Vehicles Quick Pick -->
@@ -456,13 +456,13 @@
                             <div class="payment-methods-selector">
                                 <h4>เลือกช่องทางการชำระเงิน (Polymorphic Payment)</h4>
                                 <div class="method-buttons">
-                                    <button class="pay-method-btn active" id="btnMethodPromptPay" onclick="selectPayMethod('PROMPTPAY')">
+                                    <button class="pay-method-btn active" id="btnMethodPromptPay" data-safe-click="control-30" data-handler="selectPayMethod('PROMPTPAY')">
                                         <span>📱 PromptPay QR</span>
                                     </button>
-                                    <button class="pay-method-btn" id="btnMethodCredit" onclick="selectPayMethod('CREDIT_CARD')">
+                                    <button class="pay-method-btn" id="btnMethodCredit" data-safe-click="control-31" data-handler="selectPayMethod('CREDIT_CARD')">
                                         <span>💳 บัตรเครดิต</span>
                                     </button>
-                                    <button class="pay-method-btn" id="btnMethodCash" onclick="selectPayMethod('CASH')">
+                                    <button class="pay-method-btn" id="btnMethodCash" data-safe-click="control-32" data-handler="selectPayMethod('CASH')">
                                         <span>💵 เงินสด</span>
                                     </button>
                                 </div>
@@ -476,10 +476,10 @@
                                     <div class="form-group">
                                         <label>จำนวนเงินสดที่รับมา (บาท)</label>
                                         <div class="input-with-action">
-                                            <input type="number" id="cashTenderedInput" class="form-input mono" placeholder="0.00" step="10" oninput="calculateChangePreview()">
-                                            <button type="button" class="btn-ghost" onclick="tenderExactAmount()">พอดี</button>
-                                            <button type="button" class="btn-ghost" onclick="tenderRound(100)">100฿</button>
-                                            <button type="button" class="btn-ghost" onclick="tenderRound(500)">500฿</button>
+                                            <input type="number" id="cashTenderedInput" class="form-input mono" placeholder="0.00" step="10" data-safe-input="control-33">
+                                            <button type="button" class="btn-ghost" data-safe-click="control-34" data-handler="tenderExactAmount()">พอดี</button>
+                                            <button type="button" class="btn-ghost" data-safe-click="control-35" data-handler="tenderRound(100)">100฿</button>
+                                            <button type="button" class="btn-ghost" data-safe-click="control-36" data-handler="tenderRound(500)">500฿</button>
                                         </div>
                                     </div>
                                     <div class="cash-change-preview">
@@ -488,7 +488,7 @@
                                     </div>
                                 </div>
 
-                                <button class="btn-primary btn-block btn-lg" onclick="submitPayment()">
+                                <button class="btn-primary btn-block btn-lg" data-safe-click="control-37" data-handler="submitPayment()">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                                     ยืนยันชำระเงิน & เปิดไม้กั้นทางออก (Process Payment)
                                 </button>
@@ -524,7 +524,7 @@
                             <h2>ประวัติตั๋วจอดรถและรายการธุรกรรม (Ledger)</h2>
                             <p class="text-muted">บันทึกสถานะตั๋ว ACTIVE, PAID, EXITED, LOST ทั้งหมดในระบบ</p>
                         </div>
-                        <button class="btn-secondary" onclick="loadTicketsAndPayments()">
+                        <button class="btn-secondary" data-safe-click="control-38" data-handler="loadTicketsAndPayments()">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                             รีเฟรชตาราง
                         </button>
@@ -561,15 +561,15 @@
                             <h2>ประวัติรถเข้าออกย้อนหลัง</h2>
                             <p class="text-muted">เก็บข้อมูลถาวร 3 เดือน และลบรายการเก่ากว่าอายุจัดเก็บอัตโนมัติ</p>
                         </div>
-                        <button class="btn-secondary" onclick="loadParkingHistory()">รีเฟรชข้อมูล</button>
+                        <button class="btn-secondary" data-safe-click="control-39" data-handler="loadParkingHistory()">รีเฟรชข้อมูล</button>
                     </div>
 
                     <div class="history-filter-bar">
                         <label>ตั้งแต่วันที่ <input id="historyFrom" type="date"></label>
                         <label>ถึงวันที่ <input id="historyTo" type="date"></label>
                         <label>ทะเบียนรถ <input id="historyPlate" placeholder="ค้นหาทะเบียน"></label>
-                        <button class="btn-primary" type="button" onclick="loadParkingHistory()">ค้นหา</button>
-                        <button id="historyExportButton" class="btn-secondary" type="button" onclick="exportParkingHistory()" disabled>ดาวน์โหลด Excel (.xlsx)</button>
+                        <button class="btn-primary" type="button" data-safe-click="control-40" data-handler="loadParkingHistory()">ค้นหา</button>
+                        <button id="historyExportButton" class="btn-secondary" type="button" data-safe-click="control-41" data-handler="exportParkingHistory()" disabled>ดาวน์โหลด Excel (.xlsx)</button>
                     </div>
 
                     <div class="ai-metrics-grid">
@@ -597,7 +597,7 @@
                             <h2>Dashboard รายได้และการใช้พื้นที่</h2>
                             <p class="text-muted">สรุปจากรายการชำระเงินจริงและสถานะช่องจอดปัจจุบัน</p>
                         </div>
-                        <button class="btn-secondary" onclick="loadDailyDashboard()">รีเฟรช</button>
+                        <button class="btn-secondary" data-safe-click="control-42" data-handler="loadDailyDashboard()">รีเฟรช</button>
                     </div>
                     <div class="dashboard-date-row">
                         <label for="dashboardDate">วันที่</label>
@@ -615,7 +615,7 @@
             <section id="tab-reservations" class="tab-content">
                 <div class="feature-page-grid">
                     <div class="card dashboard-forms feature-form">
-                        <form onsubmit="createReservation(event)"><label>ช่องจอด (ว่าง = จัดให้อัตโนมัติ)<select id="reservationSlot" class="form-input"></select></label>
+                        <form data-safe-submit="control-43"><label>ช่องจอด (ว่าง = จัดให้อัตโนมัติ)<select id="reservationSlot" class="form-input"></select></label>
                             <h3>จองล่วงหน้า</h3>
                             <label for="reservationPlate">ทะเบียนรถ</label>
                             <input id="reservationPlate" required placeholder="ทะเบียนรถ">
@@ -639,7 +639,7 @@
             <section id="tab-memberships" class="tab-content">
                 <div class="feature-page-grid">
                     <div class="card dashboard-forms feature-form">
-                        <form onsubmit="createMembership(event)"><label>ห้อง / หน่วยงาน<input id="memberRoom" class="form-input" maxlength="160" required></label>
+                        <form data-safe-submit="control-44"><label>ห้อง / หน่วยงาน<input id="memberRoom" class="form-input" maxlength="160" required></label>
                             <h3>บัตรสมาชิก</h3>
                             <label for="memberId">รหัสสมาชิก</label>
                             <input id="memberId" required placeholder="รหัสสมาชิก">
@@ -747,7 +747,7 @@
                             </p>
                         </div>
                         <div class="ai-hero-actions">
-                            <button class="btn-ai-pill" onclick="loadAiPredictiveData()">
+                            <button class="btn-ai-pill" data-safe-click="control-45" data-handler="loadAiPredictiveData()">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                                 ซิงค์โมเดล AI สด
                             </button>
@@ -900,11 +900,11 @@
                             <!-- Quick Prompts Chips -->
                             <div class="copilot-prompts-bar">
                                 <span class="text-muted" style="font-size: 0.85rem;">คำถามแนะนำ:</span>
-                                <button class="chip-prompt" onclick="sendQuickCopilotPrompt('มีที่จอดว่างชั้นไหนบ้าง?')">มีที่จอดว่างชั้นไหนบ้าง?</button>
-                                <button class="chip-prompt" onclick="sendQuickCopilotPrompt('รายได้สะสมของระบบขณะนี้เท่าไหร่?')">รายได้สะสมเท่าไหร่?</button>
-                                <button class="chip-prompt" onclick="sendQuickCopilotPrompt('จุดชาร์จ EV มีเงื่อนไขการใช้งานอย่างไร?')">เงื่อนไขจุดชาร์จ EV</button>
-                                <button class="chip-prompt" onclick="sendQuickCopilotPrompt('อัตราค่าบริการคิดอย่างไรตาม Strategy?')">กลยุทธ์คิดเงิน</button>
-                                <button class="chip-prompt" onclick="sendQuickCopilotPrompt('อธิบายหลักการ OOP ของระบบนี้')">อธิบายหลักการ OOP</button>
+                                <button class="chip-prompt" data-safe-click="control-46" data-handler="sendQuickCopilotPrompt('มีที่จอดว่างชั้นไหนบ้าง?')">มีที่จอดว่างชั้นไหนบ้าง?</button>
+                                <button class="chip-prompt" data-safe-click="control-47" data-handler="sendQuickCopilotPrompt('รายได้สะสมของระบบขณะนี้เท่าไหร่?')">รายได้สะสมเท่าไหร่?</button>
+                                <button class="chip-prompt" data-safe-click="control-48" data-handler="sendQuickCopilotPrompt('จุดชาร์จ EV มีเงื่อนไขการใช้งานอย่างไร?')">เงื่อนไขจุดชาร์จ EV</button>
+                                <button class="chip-prompt" data-safe-click="control-49" data-handler="sendQuickCopilotPrompt('อัตราค่าบริการคิดอย่างไรตาม Strategy?')">กลยุทธ์คิดเงิน</button>
+                                <button class="chip-prompt" data-safe-click="control-50" data-handler="sendQuickCopilotPrompt('อธิบายหลักการ OOP ของระบบนี้')">อธิบายหลักการ OOP</button>
                             </div>
 
                             <!-- Chat Messages Log -->
@@ -922,8 +922,8 @@
 
                             <!-- Chat Input Box -->
                             <div class="copilot-input-group">
-                                <input type="text" id="copilotInputText" class="form-input" placeholder="พิมพ์คำถามที่ต้องการ เช่น 'ชั้น 1 ว่างกี่ช่อง', 'ทำไมถึงแนะนำช่องนี้'..." onkeypress="handleCopilotKeyPress(event)">
-                                <button class="btn-primary" onclick="submitCopilotChat()">
+                                <input type="text" id="copilotInputText" class="form-input" placeholder="พิมพ์คำถามที่ต้องการ เช่น 'ชั้น 1 ว่างกี่ช่อง', 'ทำไมถึงแนะนำช่องนี้'..." data-safe-keypress="control-51">
+                                <button class="btn-primary" data-safe-click="control-52" data-handler="submitCopilotChat()">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                                     <span>ส่งคำถาม</span>
                                 </button>
@@ -939,7 +939,7 @@
     <!-- Ticket Issued Modal -->
     <div class="modal-overlay" id="ticketModalOverlay">
         <div class="ticket-modal">
-            <button class="modal-close-btn" onclick="closeModal('ticketModalOverlay')">&times;</button>
+            <button class="modal-close-btn" data-safe-click="control-53" data-handler="closeModal('ticketModalOverlay')">&times;</button>
             <div class="ticket-printable" id="printableTicket">
                 <div class="ticket-brand">SMART PARKING PLAZA</div>
                 <div class="ticket-subtitle">PARKING TICKET • บัตรจอดรถ</div>
@@ -986,11 +986,11 @@
                 </div>
             </div>
             <div class="modal-actions">
-                <button class="btn-secondary" onclick="window.print()">
+                <button class="btn-secondary" data-safe-click="control-54" data-handler="window.print()">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                     พิมพ์ตั๋ว
                 </button>
-                <button class="btn-primary" onclick="closeModal('ticketModalOverlay')">เข้าใจแล้ว / ปิด</button>
+                <button class="btn-primary" data-safe-click="control-55" data-handler="closeModal('ticketModalOverlay')">เข้าใจแล้ว / ปิด</button>
             </div>
         </div>
     </div>
@@ -998,7 +998,7 @@
     <!-- Payment Receipt Modal -->
     <div class="modal-overlay" id="receiptModalOverlay">
         <div class="ticket-modal">
-            <button class="modal-close-btn" onclick="closeModal('receiptModalOverlay')">&times;</button>
+            <button class="modal-close-btn" data-safe-click="control-56" data-handler="closeModal('receiptModalOverlay')">&times;</button>
             <div class="ticket-printable" id="printableReceipt">
                 <div class="receipt-check-icon">✓</div>
                 <div class="ticket-brand">PAYMENT RECEIPT</div>
@@ -1047,8 +1047,8 @@
                 </div>
             </div>
             <div class="modal-actions">
-                <button class="btn-secondary" onclick="window.print()">พิมพ์ใบเสร็จ</button>
-                <button class="btn-primary btn-block" onclick="finishPaymentAndOpenExitGate()">
+                <button class="btn-secondary" data-safe-click="control-57" data-handler="window.print()">พิมพ์ใบเสร็จ</button>
+                <button class="btn-primary btn-block" data-safe-click="control-58" data-handler="finishPaymentAndOpenExitGate()">
                     บันทึกรถออก & แสดงไม้กั้นจำลอง
                 </button>
             </div>
@@ -1058,7 +1058,7 @@
     <!-- Slot Details Quick Modal -->
     <div class="modal-overlay" id="slotDetailModalOverlay">
         <div class="ticket-modal slot-detail-modal">
-            <button class="modal-close-btn" onclick="closeModal('slotDetailModalOverlay')">&times;</button>
+            <button class="modal-close-btn" data-safe-click="control-59" data-handler="closeModal('slotDetailModalOverlay')">&times;</button>
             <div class="card-header">
                 <h2 id="slotModalNumber">F1-01</h2>
                 <span id="slotModalStatusBadge" class="status-badge available">ว่าง</span>
@@ -1069,7 +1069,7 @@
         </div>
     </div>
     <!-- Floating AI Copilot Launcher Button -->
-    <div class="floating-ai-launcher" id="floatingAiLauncher" onclick="toggleFloatingCopilot()" title="เปิด AI ผู้ช่วยอัจฉริยะ">
+    <div class="floating-ai-launcher" id="floatingAiLauncher" data-safe-click="control-60" data-handler="toggleFloatingCopilot()" title="เปิด AI ผู้ช่วยอัจฉริยะ">
         <div class="ai-launcher-icon">
             <span class="ai-sparkle">✨</span>
             <span class="ai-robot-face">🤖</span>
@@ -1085,7 +1085,7 @@
                 <strong>AI Smart Copilot</strong>
                 <span class="copilot-model-tag">OOP Grounded</span>
             </div>
-            <button class="copilot-close-btn" onclick="toggleFloatingCopilot()">&times;</button>
+            <button class="copilot-close-btn" data-safe-click="control-61" data-handler="toggleFloatingCopilot()">&times;</button>
         </div>
         <div class="floating-chat-log" id="floatingChatLog">
             <div class="chat-bubble ai">
@@ -1099,17 +1099,18 @@
             </div>
         </div>
         <div class="floating-quick-chips">
-            <button onclick="sendFloatingPrompt('ที่จอดชั้นไหนว่างสุด?')">ชั้นไหนว่างสุด?</button>
-            <button onclick="sendFloatingPrompt('รายได้สะสมตอนนี้?')">รายได้ตอนนี้?</button>
-            <button onclick="sendFloatingPrompt('จุดชาร์จ EV ว่างไหม?')">จุดชาร์จ EV?</button>
+            <button data-safe-click="control-62" data-handler="sendFloatingPrompt('ที่จอดชั้นไหนว่างสุด?')">ชั้นไหนว่างสุด?</button>
+            <button data-safe-click="control-63" data-handler="sendFloatingPrompt('รายได้สะสมตอนนี้?')">รายได้ตอนนี้?</button>
+            <button data-safe-click="control-64" data-handler="sendFloatingPrompt('จุดชาร์จ EV ว่างไหม?')">จุดชาร์จ EV?</button>
         </div>
         <div class="floating-input-row">
-            <input type="text" id="floatingCopilotInput" placeholder="ถาม AI ได้ที่นี่..." onkeypress="handleFloatingCopilotKeyPress(event)">
-            <button class="btn-primary" onclick="submitFloatingCopilotChat()">ส่ง</button>
+            <input type="text" id="floatingCopilotInput" placeholder="ถาม AI ได้ที่นี่..." data-safe-keypress="control-65">
+            <button class="btn-primary" data-safe-click="control-66" data-handler="submitFloatingCopilotChat()">ส่ง</button>
         </div>
     </div>
 
     <script src="js/platform-core.js"></script>
+    <script src="js/dashboard-events.js"></script>
     <script src="js/dashboard.js"></script>
 </body>
 </html>
