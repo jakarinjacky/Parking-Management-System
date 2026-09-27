@@ -74,7 +74,26 @@ public final class ParkingLayout {
         }
         return cells;
     }
+    /** Rich, clearly fictional starter map in a dedicated sample tenant. */
+    public static List<Map<String,Object>> sampleLayout(String businessType) {
+        List<Map<String,Object>> cells=template(businessType);
+        cells.set(1,cell("R1","BARRIER",1,7,"ไม้กั้นเข้า","STANDARD"));
+        cells.set(3,cell("R3","CROSSING",3,7,"ทางม้าลาย","STANDARD"));
+        cells.set(22,cell("R22","BARRIER",22,7,"ไม้กั้นออก","STANDARD"));
+        cells.add(cell("C1","CAMERA",1,5,"กล้องจำลอง ทางเข้า","STANDARD"));
+        cells.add(cell("S1","SENSOR",11,5,"เซนเซอร์จำลอง","STANDARD"));
+        cells.add(cell("D1","BUILDING",13,5,"อาคารตัวอย่าง","STANDARD"));
+        for(int x=0;x<24;x++) cells.add(cell("F2R"+x,x==0?"ENTRY":x==23?"EXIT":"ROAD",x,7,"ถนนชั้น 2","STANDARD",2));
+        for(int x=2;x<22;x+=2) {
+            cells.add(cell("F2A"+x,"SLOT",x,6,"F2-A-"+x,x==2?"EV_CHARGING":"STANDARD",2));
+            cells.add(cell("F2B"+x,"SLOT",x,8,"F2-B-"+x,x==4?"MOTORCYCLE":"STANDARD",2));
+        }
+        return cells;
+    }
     private static Map<String,Object> cell(String id,String type,int x,int y,String label,String slotType) {
-        return new LinkedHashMap<>(Map.of("id",id,"type",type,"x",x,"y",y,"floor",1,"rotation",0,"label",label,"slotType",slotType,"oneWay",false));
+        return cell(id,type,x,y,label,slotType,1);
+    }
+    private static Map<String,Object> cell(String id,String type,int x,int y,String label,String slotType,int floor) {
+        return new LinkedHashMap<>(Map.of("id",id,"type",type,"x",x,"y",y,"floor",floor,"rotation",0,"label",label,"slotType",slotType,"oneWay",false));
     }
 }

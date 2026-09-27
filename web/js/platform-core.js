@@ -56,6 +56,22 @@
         for(let x=2;x<22;x+=2) { add(`A${x}`,'SLOT',x,6,`A-${x}`,x===2?'EV_CHARGING':'STANDARD'); add(`B${x}`,'SLOT',x,8,`B-${x}`,x===2?'ACCESSIBLE':x===4?'MOTORCYCLE':'STANDARD'); }
         return cells;
     }
+    function sampleLayout(type) {
+        const cells=template(type==='CUSTOM'?'PUBLIC':type);
+        for(const [id,cellType,label] of [['R1','BARRIER','ไม้กั้นเข้า'],['R3','CROSSING','ทางม้าลาย'],['R22','BARRIER','ไม้กั้นออก']]) {
+            const cell=cells.find(c=>c.id===id);cell.type=cellType;cell.label=label;
+        }
+        const add=(id,cellType,x,y,label,slotType='STANDARD',floor=1)=>cells.push({id,type:cellType,x,y,label,slotType,floor,rotation:0,oneWay:false});
+        add('C1','CAMERA',1,5,'กล้องจำลอง ทางเข้า');
+        add('S1','SENSOR',11,5,'เซนเซอร์จำลอง');
+        add('D1','BUILDING',13,5,'อาคารตัวอย่าง');
+        for(let x=0;x<24;x++)add(`F2R${x}`,x===0?'ENTRY':x===23?'EXIT':'ROAD',x,7,'ถนนชั้น 2','STANDARD',2);
+        for(let x=2;x<22;x+=2) {
+            add(`F2A${x}`,'SLOT',x,6,`F2-A-${x}`,x===2?'EV_CHARGING':'STANDARD',2);
+            add(`F2B${x}`,'SLOT',x,8,`F2-B-${x}`,x===4?'MOTORCYCLE':'STANDARD',2);
+        }
+        return cells;
+    }
     function preview() {
         const sites=['CONDO','MALL','HOTEL'].map((type,i)=>({id:`preview-${i}`,tenantId:'preview',name:['Green Residence','Green Avenue Mall','Grey Garden Hotel'][i],businessType:type,address:'ข้อมูลตัวอย่างสำหรับดูหน้าตา',active:true,rate:20,freeMinutes:15,draft:template(type),published:template(type),versions:[],tickets:[],memberships:[],reservations:[],devices:[],features:{membership:true,reservation:true}}));
         return {revision:0,user:{username:'Preview',role:'owner',tenantId:'preview',siteIds:[]},tenants:[{id:'preview',name:'GreenPark • ตัวอย่าง',plan:'trial'}],users:[],audit:[],sites};
@@ -66,6 +82,6 @@
         if(slot==='EV_CHARGING') return vehicle==='ELECTRIC_VEHICLE';
         return ['CAR','ELECTRIC_VEHICLE'].includes(vehicle);
     }
-    root.PlatformCore={templates,types,slotTypes,clone,route,validate,template,preview,compatible};
+    root.PlatformCore={templates,types,slotTypes,clone,route,validate,template,sampleLayout,preview,compatible};
     if(typeof module!=='undefined') module.exports=root.PlatformCore;
 })(typeof window==='undefined'?globalThis:window);

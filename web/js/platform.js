@@ -32,7 +32,7 @@
         $('loginScreen').hidden=true; $('workspace').hidden=false;
         if(!state.sites.some(s=>s.id===siteId)) siteId=state.sites[0]?.id||'';
         $('accountName').textContent=`${state.user.username} · ${roles[state.user.role]}`;
-        $('modeBanner').textContent=preview?'ตัวอย่างอ่านอย่างเดียว • ไม่มีการบันทึกหรือควบคุมอุปกรณ์จริง':'ทดลองใช้งาน • ราคาและสิทธิ์คำนวณบนเซิร์ฟเวอร์ • อุปกรณ์รองรับ LED bench เมื่อเปิด Gateway';
+        $('modeBanner').textContent=preview?'ตัวอย่างอ่านอย่างเดียว • ไม่มีการบันทึกหรือควบคุมอุปกรณ์จริง':current()?.sample?'ลานตัวอย่าง · ทะเบียน ประวัติ และอุปกรณ์เป็นข้อมูลสมมุติ · แยกบริษัทจากข้อมูลจริง':'ข้อมูลจริงบนเซิร์ฟเวอร์ • อุปกรณ์รองรับ LED bench เมื่อเปิด Gateway';
         $('sitePicker').innerHTML=state.sites.length?options(Object.fromEntries(state.sites.map(s=>[s.id,s.name])),siteId):'<option>ยังไม่มีลานจอด</option>';
         const pages={sites:'▦  ลานจอดทั้งหมด',editor:'▧  ออกแบบผัง',operations:'↔  รถเข้า–ออก',history:'◷  ประวัติ / Excel',members:'◎  สมาชิก / การจอง',devices:'⌁  อุปกรณ์',settings:'⚙  ตั้งค่าลาน',users:'♙  ผู้ใช้ / บริษัท',audit:'≡  บันทึกกิจกรรม'};
         $('nav').innerHTML=Object.entries(pages).filter(([id])=>owner()||!['editor','settings','users','audit'].includes(id)&& (manager()||!['history','members','devices'].includes(id))).map(([id,label])=>`<button data-nav="${id}" class="${id===tab?'active':''}">${label}</button>`).join('');
@@ -45,15 +45,18 @@
     function table(headers,rows) { return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`; }
     function render() {
         let content=''; const s=current();
-        if(tab!=='sites'&&tab!=='users'&&tab!=='audit'&&!s) { $('main').innerHTML=empty('สร้างลานจอดก่อนเริ่มใช้งาน'); return; }
+        if(tab!=='sites'&&tab!=='users'&&tab!=='audit'&&!s) {
+            $('main').innerHTML=heading('ยังไม่มีลานจอด','สร้างลานก่อนใช้เครื่องมือออกแบบและรับรถ')+`<div class="card onboarding"><h2>เริ่มออกแบบลานจอด</h2><p>ลานตัวอย่างมีถนน 2 ชั้น ช่องจอด กล้องและไม้กั้นจำลอง พร้อมประวัติรถ 3 เดือน ข้อมูลทั้งหมดระบุว่าเป็นตัวอย่างและอยู่ในบริษัททดลองแยกต่างหาก</p><div class="actions">${state.user.role==='super_admin'&&!state.tenants.some(t=>t.sample)?button('sampleWorkspace','＋ สร้างพื้นที่ทดลอง',true,writeDisabled()):''}${state.user.role==='super_admin'?button('tenant','สร้างบริษัทจริง',false,writeDisabled()):''}${owner()&&state.tenants.length?button('createSite','สร้างลานจอดจริง',false,writeDisabled()):''}</div></div>`;
+            return;
+        }
         if(tab==='sites') {
             const slots=state.sites.flatMap(s=>s.published).filter(c=>c.type==='SLOT').length, active=state.sites.flatMap(s=>s.tickets).filter(t=>t.status==='ACTIVE').length;
-            content=heading('ทุกพื้นที่ ในมุมมองเดียว','เลือกแม่แบบ แล้วปรับลานให้เป็นของคุณ',owner()?button('createSite','＋ สร้างลานจอด',true,writeDisabled()):'');
+            content=heading('ทุกพื้นที่ ในมุมมองเดียว','เลือกแม่แบบ แล้วปรับลานให้เป็นของคุณ',owner()&&state.tenants.length?button('createSite','＋ สร้างลานจอด',true,writeDisabled()):'');
             content+=`<div class="metrics">${metric('ลานจอดทั้งหมด',state.sites.length)}${metric('ช่องที่เผยแพร่',slots)}${metric('รถในลาน',active)}${metric('บริษัทที่เข้าถึงได้',state.tenants.length)}</div>`;
-            content+=`<div class="cards">${state.sites.map(s=>`<article class="card"><div class="card-top"><span class="site-icon">▦</span><span class="tag">${escape(C.templates[s.businessType]?.[0]||s.businessType)}</span></div><h2>${escape(s.name)}</h2><p>${escape(C.templates[s.businessType]?.[1]||'')}</p><div class="site-stats"><span>${s.published.filter(c=>c.type==='SLOT').length} ช่องใช้งาน</span><span>${s.versions.length?'เผยแพร่แล้ว':'แบบร่าง'}</span></div><p>ราคา ${money(s.rate)}/ชม. · ฟรี ${s.freeMinutes} นาทีแรก</p><div class="actions">${button('openSite','เปิดลาน →',true,false,`data-id="${escape(s.id)}"`)}${owner()?button('editSite','ออกแบบผัง',false,false,`data-id="${escape(s.id)}"`):''}</div></article>`).join('')}</div>`;
-            if(!state.sites.length) content+=empty('ยังไม่มีลาน — เจ้าของแพลตฟอร์มสร้างบริษัทก่อน แล้วเจ้าของบริษัทจึงสร้างลานได้');
+            content+=`<div class="cards">${state.sites.map(s=>`<article class="card"><div class="card-top"><span class="site-icon">▦</span><span class="tag">${s.sample?'ข้อมูลสมมุติ · ':''}${escape(C.templates[s.businessType]?.[0]||s.businessType)}</span></div><h2>${escape(s.name)}</h2><p>${escape(C.templates[s.businessType]?.[1]||'')}</p><div class="site-stats"><span>${s.published.filter(c=>c.type==='SLOT').length} ช่องใช้งาน</span><span>${s.versions.length?'เผยแพร่แล้ว':'แบบร่าง'}</span></div><p>ราคา ${money(s.rate)}/ชม. · ฟรี ${s.freeMinutes} นาทีแรก</p><div class="actions">${button('openSite','เปิดลาน →',true,false,`data-id="${escape(s.id)}"`)}${owner()?button('editSite','ออกแบบผัง',false,false,`data-id="${escape(s.id)}"`):''}</div></article>`).join('')}</div>`;
+            if(!state.sites.length) content+=`<div class="card onboarding"><h2>เริ่มจากลานตัวอย่าง</h2><p>สร้างลานคอนโด ห้าง และโรงแรมที่มีผังพร้อมทดลอง พร้อมข้อมูลประวัติสมมุติ 3 เดือนในบริษัททดลองแยกต่างหาก</p><div class="actions">${state.user.role==='super_admin'&&!state.tenants.some(t=>t.sample)?button('sampleWorkspace','＋ สร้างพื้นที่ทดลอง',true,writeDisabled()):''}${state.user.role==='super_admin'?button('tenant','สร้างบริษัทจริง',false,writeDisabled()):''}</div></div>`;
         } else if(tab==='editor') {
-            content=heading('ออกแบบพื้นที่ของคุณ',`${escape(s.name)} · Grid 24 × 16 ต่อชั้น · ช่องละหนึ่งหน่วยเชิงตรรกะ`,button('validate','ตรวจผัง')+button('saveLayout','บันทึกแบบร่าง',false,writeDisabled())+button('publish','เผยแพร่ผัง',true,writeDisabled()));
+            content=heading('ออกแบบพื้นที่ของคุณ',`${escape(s.name)} · Grid 24 × 16 ต่อชั้น · ช่องละหนึ่งหน่วยเชิงตรรกะ`,button('sampleLayout','ใส่ผังตัวอย่าง',false,writeDisabled())+button('validate','ตรวจผัง')+button('saveLayout','บันทึกแบบร่าง',false,writeDisabled())+button('publish','เผยแพร่ผัง',true,writeDisabled()));
             content+=`<div class="editor"><div class="tools">${Object.entries(C.types).map(([type,label])=>`<button data-tool="${type}" draggable="${!['SELECT','ERASE'].includes(type)}" class="${tool===type?'selected':''}">${label}</button>`).join('')}<p class="help">เลือกเครื่องมือแล้วแตะตาราง หรือลากลงพื้นที่<br>เลือก/ย้าย: ลากชิ้นส่วนเดิม<br>ถนนต่อมุมกันได้ด้วยช่องติดกัน</p></div><div class="canvas-shell"><div class="canvas-toolbar"><select id="floorPicker" aria-label="ชั้น">${options(Object.fromEntries(Array.from({length:8},(_,i)=>[i+1,`ชั้น ${i+1}`])),floor)}</select>${button('undo','↶ ย้อน',false,!undo.length)}${button('redo','↷ ทำซ้ำ',false,!redo.length)}<span class="help">${dirty?'● ยังไม่บันทึก':'บันทึกแล้ว'} · ${draft.filter(c=>c.type==='SLOT').length} ช่อง</span></div><div class="canvas-scroll">${grid(draft)}</div><div class="legend"><span><b>สีเขียว</b> ช่องจอด</span><span>สีเทา ถนน</span><span>ทางเดียว → ↓ ← ↑</span></div>${inspector()}</div></div>`;
             content+=`<div class="card section-gap"><h3>เวอร์ชันที่เผยแพร่ (ล่าสุดไม่เกิน 20)</h3><p>การเรียกคืนจะสร้างแบบร่าง ต้องตรวจและเผยแพร่อีกครั้ง ผังนี้ไม่รับรองความกว้างถนน รัศมีเลี้ยว หรือมาตรฐานก่อสร้าง</p>${s.versions.slice().reverse().map((v,i)=>`<div class="version-row"><span>${time(v.at)} · ${v.cells.length} องค์ประกอบ</span>${button('restore','เรียกเป็นแบบร่าง',false,writeDisabled(),`data-id="${escape(v.id)}"`)}</div>`).join('')||'<p>ยังไม่เคยเผยแพร่</p>'}</div>`;
         } else if(tab==='operations') {
@@ -136,6 +139,18 @@
     }
     async function action(name,element) {
         const s=current();
+        if(name==='sampleWorkspace') {
+            if(!confirm('สร้างบริษัททดลองพร้อมลานคอนโด ห้าง โรงแรม และประวัติสมมุติ 3 เดือน? ข้อมูลนี้แยกจากบริษัทจริง'))return;
+            const before=new Set(state.sites.map(item=>item.id));
+            await command('createSampleWorkspace');
+            siteId=state.sites.find(item=>!before.has(item.id))?.id||'';
+            tab='editor';floor=1;loadDraft();showWorkspace();notice('สร้างพื้นที่ทดลองแล้ว เลือกเครื่องมือทางซ้ายเพื่อแก้ผัง หรือสลับชั้นด้านบน');return;
+        }
+        if(name==='sampleLayout') {
+            if(draft.length&&!confirm('แทนที่แบบร่างปัจจุบันด้วยผังตัวอย่าง 2 ชั้น? สามารถกดย้อนกลับได้ก่อนบันทึก'))return;
+            mutate(()=>{draft=C.sampleLayout(s.businessType);selected='';floor=1;});
+            notice('ใส่ผังตัวอย่างในแบบร่างแล้ว ตรวจผังและบันทึกก่อนเผยแพร่');return;
+        }
         if(name==='roadCurve') modal('ถนนโค้งแบบร่าง (เมตร)',field('label','ชื่อถนน')+['x1','y1','cx','cy','x2','y2'].map((k,i)=>field(k,({x1:'เริ่ม X',y1:'เริ่ม Y',cx:'จุดควบคุม X',cy:'จุดควบคุม Y',x2:'จบ X',y2:'จบ Y'})[k],'number',[10,10,80,10,80,80][i],'min="0" max="100"')).join('')+field('width','ความกว้างถนน (เมตร)','number',6,'min="2" max="12"'),f=>command('addRoadCurve',{label:f.get('label'),floor,...Object.fromEntries(['x1','y1','cx','cy','x2','y2','width'].map(k=>[k,Number(f.get(k))]))}));
         if(name==='removeCurve') {if(!confirm('ลบถนนแบบร่างนี้?'))return;await command('removeRoadCurve',{curveId:element.dataset.id});showWorkspace();}
         if(name==='provision') {

@@ -191,6 +191,20 @@ with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
         owner.request('login',{'username':'owner','password':'ChangedPassword123!'})
         assert len(owner.state['sites'])==4
         assert 'ChangedPassword123!' not in json.dumps(owner.state)
+        owner.command('createSampleWorkspace', expected=403)
+        superuser=Client(); superuser.login('superadmin')
+        before_tenants=len(superuser.state['tenants'])
+        superuser.command('createSampleWorkspace')
+        examples=[s for s in superuser.state['sites'] if s.get('sample')]
+        assert len(examples)==3
+        assert len(superuser.state['tenants'])==before_tenants+1
+        assert all(len(s['published'])>60 and len(s['versions'])==1 for s in examples)
+        assert all(sum(t.get('sample',False) for t in s['tickets'])==30 for s in examples)
+        assert all({c['floor'] for c in s['draft']}=={1,2} for s in examples)
+        superuser.command('createSampleWorkspace',expected=400)
+        assert len(superuser.state['tenants'])==before_tenants+1
+        other.request('state')
+        assert not any(s.get('sample') for s in other.state['sites'])
         print('Platform HTTP PASS: tenant isolation, roles, layouts, publication guards, transactions, reservations, users, XLSX source data, restart persistence')
     finally:
         process.terminate(); process.wait(timeout=5)
