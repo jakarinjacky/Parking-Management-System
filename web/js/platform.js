@@ -148,10 +148,11 @@
         mutate(()=>{const id=crypto.randomUUID();draft.push({id,type,x,y,floor,label:type==='SLOT'?`F${floor}-${x+1}-${y+1}`:C.types[type],slotType:'STANDARD',rotation:0,oneWay:false});selected=id;});
     }
     function fee(t) {
-        const seconds=Math.max(0,Math.floor((Date.now()-new Date(t.entryTime).getTime())/1000));
+        if(t.paidAt)return Number(t.fee||0);
+        const seconds=Math.max(0,Math.floor((Date.now()+(current()?.sample?Number(current().simulationMinutes||0)*60000:0)-new Date(t.entryTime).getTime())/1000));
         const hours=Math.ceil(Math.max(0,seconds-t.freeMinutes*60)/3600),cap=Number(t.dailyCap||0),rate=Number(t.rate);
         const gross=cap>0?Math.floor(hours/24)*Math.min(24*rate,cap)+Math.min((hours%24)*rate,cap):hours*rate;
-        return Math.ceil(gross*(100-Math.max(t.memberDiscountPercent||0,t.couponDiscountPercent||0))/100);
+        return Math.ceil(gross*(100-Math.max(t.memberDiscountPercent||0,t.couponDiscountPercent||0))/100)+Number(t.lostTicketPenalty||0);
     }
     function historyRows() { return current().tickets.filter(t=>{const date=new Date(t.entryTime), local=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;return (!filters.from||local>=filters.from)&&(!filters.to||local<=filters.to)&&t.licensePlate.toLowerCase().includes(filters.plate.toLowerCase());}).slice().sort((a,b)=>b.entryTime.localeCompare(a.entryTime)); }
     function field(name,label,type='text',value='',extra='') { return `<label>${label}<input name="${name}" type="${type}" value="${escape(value)}" required maxlength="160" ${extra}></label>`; }

@@ -229,6 +229,37 @@ with tempfile.TemporaryDirectory(prefix='parking-platform-tests-') as temporary:
         assert len(superuser.state['tenants'])==before_tenants+1
         other.request('state')
         assert not any(s.get('sample') for s in other.state['sites'])
+        # All fee/payment operations are authorized against the selected customer site.
+        sample_id=examples[0]['id']
+        owner.command('sampleTime',expected=403,siteId=sid,minutes=60)
+        owner.request('quote',{'siteId':sample_id,'query':'unknown'},expected=403)
+        superuser.command('checkin',siteId=sample_id,plate='PAID-TEST',slotId='A4',vehicleType='CAR')
+        superuser.command('sampleTime',siteId=sample_id,minutes=120)
+        quote=superuser.request('quote',{'siteId':sample_id,'query':'PAID-TEST'})
+        assert quote['fee']>0
+        superuser.command('reportLostTicket',siteId=sample_id,query='PAID-TEST')
+        lost=superuser.request('quote',{'siteId':sample_id,'query':'PAID-TEST'})
+        assert lost['fee']==quote['fee']+300
+        payload=dict(siteId=sample_id,ticketId=lost['ticketId'],expectedFee=lost['fee'],method='CASH',cashTendered=lost['fee']+100,confirmed=True)
+        superuser.command('recordPayment',expected=409,**{**payload,'expectedFee':0})
+        superuser.command('recordPayment',expected=400,**{**payload,'cashTendered':1})
+        superuser.command('recordPayment',expected=403,**{**payload,'confirmed':False})
+        superuser.command('recordPayment',**payload)
+        assert superuser.state['operationResult']['change']==100
+        superuser.command('recordPayment',expected=403,**payload)
+        superuser.command('checkout',siteId=sample_id,ticketId=lost['ticketId'])
+        paid=next(t for ss in superuser.state['sites'] if ss['id']==sample_id for t in ss['tickets'] if t['ticketId']==lost['ticketId'])
+        assert paid['fee']==lost['fee'] and paid['paymentMethod']=='MANUAL_CASH'
+        superuser.command('checkout',expected=400,siteId=sample_id,ticketId=lost['ticketId'])
+        superuser.command('sampleTime',siteId=sample_id,minutes=0,reset=True)
+        for method in ['PROMPTPAY','CREDIT_CARD']:
+            superuser.command('checkin',siteId=sample_id,plate=method,slotId='A4',vehicleType='CAR')
+            q=superuser.request('quote',{'siteId':sample_id,'query':method})
+            data=dict(siteId=sample_id,ticketId=q['ticketId'],method=method,expectedFee=q['fee'],confirmed=True)
+            superuser.command('recordPayment',expected=400,**data,reference='')
+            superuser.command('recordPayment',**data,reference='EXTERNAL-RECEIPT-'+method)
+            assert superuser.state['operationResult']['paymentMethod']=='MANUAL_'+method
+            superuser.command('checkout',siteId=sample_id,ticketId=q['ticketId'])
         print('Platform HTTP PASS: tenant isolation, roles, layouts, publication guards, transactions, reservations, users, XLSX source data, restart persistence')
     finally:
         process.terminate(); process.wait(timeout=5)

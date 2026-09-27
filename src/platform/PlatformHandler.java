@@ -71,7 +71,7 @@ public final class PlatformHandler implements HttpHandler {
             String token=cookie(exchange); Session session=sessions.get(token);
             if(session==null||!session.expires().isAfter(Instant.now())) { sessions.remove(token); reply(exchange,401,Map.of("error","กรุณาเข้าสู่แพลตฟอร์ม")); return; }
             synchronized(service) {
-            var request=path.equals("/api/platform/command")&&write?body(exchange):Map.<String,Object>of();
+            var request=(path.equals("/api/platform/command")||path.equals("/api/platform/quote"))&&write?body(exchange):Map.<String,Object>of();
             Object result=service.atomic(()->{
                 try { if(session.version()!=service.sessionVersion(session.userId())) throw new SessionExpired(); }
                 catch(SecurityException e) { sessions.remove(token); throw new SessionExpired(); }
@@ -79,6 +79,7 @@ public final class PlatformHandler implements HttpHandler {
                     String workspace=exchange.getRequestHeaders().getFirst("X-Workspace-Tenant");
                     return workspace==null?service.view(session.userId()):service.workspace(session.userId(),workspace);
                 }
+                if(path.equals("/api/platform/quote")&&write) return service.quote(session.userId(),request);
                 if(path.equals("/api/platform/command")&&write) return service.command(session.userId(),request);
                 return null;
             });
