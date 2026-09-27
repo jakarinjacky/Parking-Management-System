@@ -219,6 +219,11 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await onboarding.locator('#loginForm [name=username]').fill('superadmin');
   await onboarding.locator('#loginForm [name=password]').fill('SandboxPassword123!');
   await onboarding.locator('#loginForm button[type=submit]').click();
+  await onboarding.locator('#analyticsDays').waitFor();
+  await onboarding.locator('#analyticsDays').selectOption('7');
+  assert((await onboarding.locator('#main').innerText()).includes('ยังไม่มีลูกค้าจริง'));
+  await onboarding.screenshot({path:'browser-artifacts/platform-owner-analytics.png',fullPage:true});
+  await onboarding.locator('[data-nav=customers]').click();
   await onboarding.locator('[data-action=sampleWorkspace]').waitFor();
   await onboarding.locator('[data-action=sampleWorkspace]').click();
   await onboarding.locator('#main .grid').waitFor();
@@ -236,6 +241,14 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await onboarding.locator('#modal [name=password]').fill('CustomerPassword123!');
   await onboarding.locator('#modal button[type=submit]').click();
   await onboarding.locator('#modal').waitFor({state:'hidden'});
+  await onboarding.locator('[data-nav=analytics]').click();
+  assert((await onboarding.locator('#main').innerText()).includes('Isolated customer'));
+  await onboarding.locator('#analyticsDays').selectOption('90');
+  await onboarding.screenshot({path:'browser-artifacts/platform-owner-analytics-desktop.png',fullPage:true});
+  await onboarding.setViewportSize({width:390,height:844});
+  await onboarding.screenshot({path:'browser-artifacts/platform-owner-analytics-mobile.png',fullPage:true});
+  await onboarding.setViewportSize({width:1280,height:900});
+  await onboarding.locator('[data-nav=customers]').click();
   const customerRow=onboarding.locator('tr').filter({hasText:'Isolated customer'});
   await customerRow.locator('[data-action=enterTenant]').click();
   assert.equal(await onboarding.locator('.cards .card').count(),0);
