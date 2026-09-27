@@ -1199,6 +1199,9 @@ public class ParkingServer {
         // [OOP: METHOD] Method handle() คือพฤติกรรม/การทำงานที่ object หรือ class นี้ให้บริการ
         public void handle(HttpExchange exchange) throws IOException {
             String path = exchange.getRequestURI().getPath();
+            if (platformOnly || path.equals("/platform.html") || path.equals("/dashboard.html") || path.equals("/contact.html")) {
+                platform.SecurityHeaders.apply(exchange.getResponseHeaders());
+            }
             if (platformOnly && (path == null || path.equals("/") || path.isEmpty()
                     || path.equals("/index.html") || path.equals("/login.html"))) {
                 exchange.getResponseHeaders().set("Location", "/dashboard.html");

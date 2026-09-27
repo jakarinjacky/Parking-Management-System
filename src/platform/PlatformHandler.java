@@ -105,6 +105,7 @@ public final class PlatformHandler implements HttpHandler {
         return PlatformService.map(Json.parse(new String(bytes,StandardCharsets.UTF_8)));
     }
     private void reply(HttpExchange exchange,int status,Object body) throws IOException {
+        SecurityHeaders.apply(exchange.getResponseHeaders());
         byte[] bytes=SimpleJson.toJson(body).getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type","application/json; charset=utf-8");
         exchange.getResponseHeaders().set("Cache-Control","no-store");
