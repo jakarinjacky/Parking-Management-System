@@ -42,7 +42,7 @@ public final class PlatformService {
     }
     private void initialize(boolean demo,String adminPassword) throws Exception {
         String saved=store.load();
-        if(saved!=null&&!saved.isBlank()) { state=map(Json.parse(saved)); PlatformAnalytics.initialize(state); persist(); return; }
+        if(saved!=null&&!saved.isBlank()) { state=map(Json.parse(saved)); PlatformAnalytics.initialize(state); state.putIfAbsent("supportTickets",new ArrayList<>()); persist(); return; }
         state=new LinkedHashMap<>(Map.of("revision",0,"tenants",new ArrayList<>(),"sites",new ArrayList<>(),"users",new ArrayList<>(),"audit",new ArrayList<>()));
         if(demo) {
             addTenant("DEMO-A","Green Park • บริษัทตัวอย่าง", "trial");
@@ -61,6 +61,7 @@ public final class PlatformService {
             addUser("superadmin",adminPassword,"super_admin","",List.of());
         } else { throw new IllegalArgumentException("Set PLATFORM_ADMIN_PASSWORD (12–128 characters) before first startup"); }
         PlatformAnalytics.initialize(state);
+        state.put("supportTickets",new ArrayList<>());
         persist();
     }
     @SuppressWarnings("unchecked") public static Map<String,Object> map(Object o) {
@@ -109,10 +110,22 @@ public final class PlatformService {
         String salt=u==null?"AAAAAAAAAAAAAAAAAAAAAA==":u.get("salt").toString();
         String calculated=hash(password,salt);
         if(u==null||Boolean.FALSE.equals(u.get("active"))||!MessageDigest.isEqual(calculated.getBytes(StandardCharsets.UTF_8),u.get("hash").toString().getBytes(StandardCharsets.UTF_8))) throw new SecurityException("ข้อมูลเข้าสู่ระบบไม่ถูกต้อง");
+        requireTenantActive(u);
         return u.get("id").toString();
     }
     private Map<String,Object> user(String userId) {
         return list(state,"users").stream().filter(u->u.get("id").equals(userId)).findFirst().orElseThrow(()->new SecurityException("กรุณาเข้าสู่ระบบ"));
+    }
+    private Map<String,Object> supportMessage(Map<String,Object> u,Map<String,Object> request) {
+        Object value=request.get("message");
+        if(!(value instanceof String text)||text.isBlank()||text.length()>4000) throw new IllegalArgumentException("รายละเอียดต้องมี 1–4000 ตัวอักษร");
+        return new LinkedHashMap<>(Map.of("author",u.get("username"),"operator",superUser(u),"text",text.trim(),"at",now()));
+    }
+    private boolean tenantActive(Object tenantId) {
+        return list(state,"tenants").stream().anyMatch(t->t.get("id").equals(tenantId)&&!Boolean.FALSE.equals(t.get("active")));
+    }
+    private void requireTenantActive(Map<String,Object> u) {
+        if(!superUser(u)&&!tenantActive(u.get("tenantId"))) throw new SecurityException("บริษัทถูกระงับการใช้งาน กรุณาติดต่อเจ้าของแพลตฟอร์ม");
     }
     private boolean superUser(Map<String,Object> u) { return u.get("role").equals("super_admin"); }
     public synchronized int sessionVersion(String userId) {
@@ -120,6 +133,7 @@ public final class PlatformService {
     }
     private int sessionVersionLocked(String userId) {
         var u=user(userId);
+        requireTenantActive(u);
         if(Boolean.FALSE.equals(u.get("active"))) throw new SecurityException("บัญชีถูกปิดใช้งาน");
         return ((Number)u.getOrDefault("authVersion",0)).intValue();
     }
@@ -153,7 +167,7 @@ public final class PlatformService {
     }
     private Map<String,Object> site(Map<String,Object> u,String id) {
         var site=list(state,"sites").stream().filter(s->s.get("id").equals(id)).findFirst().orElseThrow(()->new IllegalArgumentException("ไม่พบลาน"));
-        require(access(u,site)); return site;
+        requireTenantActive(u); require(access(u,site)); return site;
     }
     private Map<String,Object> publicUser(Map<String,Object> u) {
         var result=new LinkedHashMap<>(u); result.remove("salt"); result.remove("hash"); return result;
@@ -176,6 +190,7 @@ public final class PlatformService {
     }
     private Map<String,Object> viewLocked(String userId) {
         var u=user(userId);
+        requireTenantActive(u);
         purgeExpiredHistory();
         String cutoff=ZonedDateTime.now(ZoneOffset.UTC).minusMonths(3).toInstant().toString();
         List<Map<String,Object>> sites=new ArrayList<>();
@@ -194,6 +209,7 @@ public final class PlatformService {
             "users",owner(u)?list(state,"users").stream().filter(v->superUser(u)||v.get("tenantId").equals(u.get("tenantId"))).map(this::publicUser).toList():List.of(),
             "audit",owner(u)?list(state,"audit").stream().filter(a->superUser(u)||a.get("tenantId").equals(u.get("tenantId"))).toList():List.of(),
             "storage",store.description()));
+        result.put("supportTickets",list(state,"supportTickets").stream().filter(t->superUser(u)||u.get("tenantId").equals(t.get("tenantId"))).toList());
         if(superUser(u)) result.put("platformAnalytics",PlatformAnalytics.report(state));
         return result;
     }
@@ -227,6 +243,7 @@ public final class PlatformService {
     public synchronized Map<String,Object> deviceEvent(String token,Map<String,Object> request) {
         return atomic(()->{
             var s=list(state,"sites").stream().filter(v->v.get("id").equals(string(request,"siteId"))).findFirst().orElseThrow(()->new SecurityException("Device authentication failed"));
+            require(tenantActive(s.get("tenantId")));
             var d=list(s,"devices").stream().filter(v->v.get("id").equals(string(request,"deviceId"))).findFirst().orElseThrow(()->new SecurityException("Device authentication failed"));
             var result=DeviceGateway.event(d,token,request); persist(); return result;
         });
@@ -269,7 +286,7 @@ public final class PlatformService {
     private Map<String,Object> commandLocked(String userId,Map<String,Object> request) throws Exception {
         String before=SimpleJson.toJson(state);
         try {
-            var u=user(userId); String action=string(request,"action");
+            var u=user(userId); requireTenantActive(u); String action=string(request,"action");
             if(integer(request,"revision",0,Integer.MAX_VALUE)!=((Number)state.get("revision")).intValue()) throw new ConcurrentModificationException("มีข้อมูลใหม่ กรุณารีเฟรชก่อนบันทึก");
             String tenant=u.get("tenantId").toString(), siteId="";
             String deviceSecret=null; Map<String,Object> operationResult=null;
@@ -299,6 +316,42 @@ public final class PlatformService {
                     if(!(raw instanceof List<?> assigned)||assigned.isEmpty()) throw new IllegalArgumentException("เลือกลานให้ผู้ใช้");
                     for(Object sid:assigned) { var assignedSite=site(u,sid.toString()); require(assignedSite.get("tenantId").equals(tenant)); }
                     target.put("role",role); target.put("siteIds",new ArrayList<>(assigned)); revoke(target);
+                }
+            } else if(action.equals("createSupportTicket")) {
+                require(!superUser(u));
+                var issue=new LinkedHashMap<String,Object>();
+                issue.put("id",id());issue.put("tenantId",tenant);issue.put("subject",string(request,"subject"));
+                issue.put("status","OPEN");issue.put("createdAt",now());issue.put("updatedAt",now());
+                issue.put("messages",new ArrayList<>(List.of(supportMessage(u,request))));
+                list(state,"supportTickets").add(issue);
+            } else if(Set.of("replySupportTicket","setSupportStatus").contains(action)) {
+                String ticketId=string(request,"ticketId");
+                var issue=list(state,"supportTickets").stream().filter(t->ticketId.equals(t.get("id"))).findFirst().orElseThrow(()->new IllegalArgumentException("ไม่พบรายการแจ้งปัญหา"));
+                require(superUser(u)||u.get("tenantId").equals(issue.get("tenantId")));tenant=issue.get("tenantId").toString();
+                if(action.equals("replySupportTicket")) {
+                    list(issue,"messages").add(supportMessage(u,request));
+                    if(!superUser(u)&&"RESOLVED".equals(issue.get("status"))) issue.put("status","OPEN");
+                } else {
+                    require(superUser(u));String status=string(request,"status");
+                    if(!Set.of("OPEN","IN_PROGRESS","RESOLVED").contains(status))throw new IllegalArgumentException("สถานะไม่ถูกต้อง");
+                    issue.put("status",status);
+                }
+                issue.put("updatedAt",now());
+            } else if(Set.of("setTenantActive","deleteTenant").contains(action)) {
+                require(superUser(u));
+                tenant=string(request,"tenantId"); final String targetId=tenant;
+                var target=list(state,"tenants").stream().filter(t->t.get("id").equals(targetId)).findFirst().orElseThrow(()->new IllegalArgumentException("ไม่พบบริษัท"));
+                if(action.equals("setTenantActive")) {
+                    if(!(request.get("active") instanceof Boolean)) throw new IllegalArgumentException("active must be boolean");
+                    target.put("active",request.get("active"));target.put("statusChangedAt",now());
+                    for(var member:list(state,"users")) if(targetId.equals(member.get("tenantId"))) revoke(member);
+                } else {
+                    if(!Boolean.FALSE.equals(target.get("active"))) throw new IllegalArgumentException("ระงับบริษัทก่อนลบข้อมูล");
+                    if(!target.get("name").equals(string(request,"confirmationName"))) throw new IllegalArgumentException("ชื่อบริษัทยืนยันไม่ตรงกัน");
+                    loginLocked(u.get("username").toString(),password(request,"currentPassword"));
+                    if(list(state,"users").stream().anyMatch(member->targetId.equals(member.get("tenantId"))&&superUser(member))) throw new IllegalArgumentException("ลบบริษัทที่มีบัญชีเจ้าของแพลตฟอร์มไม่ได้");
+                    for(String key:List.of("sites","users","audit","usageDaily","supportTickets")) list(state,key).removeIf(item->targetId.equals(item.get("tenantId")));
+                    list(state,"tenants").remove(target);
                 }
             } else if(action.equals("createTenant")) {
                 require(superUser(u)); tenant=id(); addTenant(tenant,string(request,"name"),"trial");
