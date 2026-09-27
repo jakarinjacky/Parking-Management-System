@@ -15,6 +15,8 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   for(let i=0;i<100;i++){try{const r=await fetch('http://localhost:8080/api/platform/state');if(r.status===401)break;}catch{}await new Promise(r=>setTimeout(r,100));}
   browser=await chromium.launch({headless:true});
   const page=await browser.newPage({viewport:{width:1440,height:1000}}), errors=[];
+  // Public HTTP origins lack randomUUID; localhost otherwise hides this regression.
+  await page.addInitScript(() => Object.defineProperty(crypto, 'randomUUID', {value:undefined}));
   page.on('pageerror',e=>errors.push(e.message));
   page.on('dialog',d=>d.accept());
   await page.goto('http://localhost:8080/platform.html');
@@ -24,6 +26,27 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await page.locator('#workspace').waitFor({state:'visible'});
   await page.screenshot({animations:'disabled',path:path.join(tmp,'platform-desktop.png'),fullPage:true});
   await page.locator('[data-action=editSite]').first().click();
+  const placed=[];
+  for (const [i,type] of ['ROAD','ENTRY','EXIT','SLOT','CROSSING','BUILDING','CAMERA','BARRIER','SENSOR'].entries()) {
+   await page.locator(`[data-tool=${type}]`).click();
+   const cell=page.locator(`.grid [data-x="${i}"][data-y="0"]`);
+   await cell.click();
+   assert((await cell.getAttribute('class')).split(' ').includes(type));
+   placed.push(await cell.getAttribute('data-cell'));
+  }
+  assert.equal(new Set(placed).size,9);
+  await page.locator('[data-action=undo]').click();
+  assert.equal(await page.locator('.grid [data-x="8"][data-y="0"]').getAttribute('data-cell'),null);
+  await page.locator('[data-action=redo]').click();
+  await page.locator('[data-action=saveLayout]').click();
+  await page.waitForFunction(()=>document.querySelector('.canvas-toolbar')?.textContent.includes('บันทึกแล้ว'));
+  await page.reload();
+  await page.locator('[data-action=editSite]').first().click();
+  for (const [i,id] of placed.entries()) assert.equal(await page.locator(`.grid [data-x="${i}"][data-y="0"]`).getAttribute('data-cell'),id);
+  await page.screenshot({animations:'disabled',path:path.join(tmp,'editor-http-placement.png'),fullPage:true});
+  // Remove isolated test pieces before publishing the existing valid layout.
+  await page.locator('[data-tool=ERASE]').click();
+  for (let i=0;i<9;i++) await page.locator(`.grid [data-x="${i}"][data-y="0"]`).click();
   await page.locator('[data-action=publish]').click();
   await page.locator('#notice').filter({hasText:'เผยแพร่ผังแล้ว'}).waitFor();
   await page.locator('[data-nav=operations]').click();
