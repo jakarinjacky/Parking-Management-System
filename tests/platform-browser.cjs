@@ -37,9 +37,41 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   await page.goto('http://localhost:8080/dashboard.html');
   await page.locator('#workspace').waitFor({state:'visible'});
   assert(await page.locator('#slotMap').innerText().then(t=>t.includes('BROWSER-01')));
+  assert((await page.locator('.brand').innerText()).includes('Smart Parking System'));
+  assert((await page.locator('#boardMessage').innerText()).includes('ว่าง'));
+  await page.locator('[data-slot=A6]').click();
+  assert.equal(await page.locator('#entryForm [name=slotId]').inputValue(),'A6');
+  await page.locator('[data-tab=map]').click();
+  await page.screenshot({path:path.join(tmp,'dashboard-reference-desktop.png'),fullPage:true});
   await page.locator('[data-tab=exit]').click();
   await page.locator('[data-exit]').click();
   await page.locator('#notice').filter({hasText:'บันทึกรถออกแล้ว'}).waitFor();
+  await page.locator('[data-tab=ledger]').click();
+  assert((await page.locator('#ledgerTable').innerText()).includes('BROWSER-01'));
+  await page.locator('[data-tab=members]').click();
+  await page.locator('#memberForm [name=name]').fill('Dashboard member');
+  await page.locator('#memberForm [name=plate]').fill('DASH-MEMBER');
+  await page.locator('#memberForm [name=room]').fill('D101');
+  await page.locator('#memberForm [name=starts]').fill('2026-01-01');
+  await page.locator('#memberForm [name=expires]').fill('2030-12-31');
+  await page.locator('#memberForm button').click();
+  await page.locator('#membersTable').getByText('Dashboard member').waitFor();
+  await page.locator('[data-tab=reservations]').click();
+  await page.locator('#reservationForm [name=plate]').fill('DASH-BOOKING');
+  await page.locator('#reservationForm [name=slotId]').selectOption('A6');
+  await page.locator('#reservationForm [name=from]').fill('2030-12-01T10:00');
+  await page.locator('#reservationForm [name=to]').fill('2030-12-01T11:00');
+  await page.locator('#reservationForm button').click();
+  await page.locator('#reservationsTable').getByText('DASH-BOOKING').waitFor();
+  await page.locator('[data-cancel]').click();
+  await page.locator('#notice').filter({hasText:'ยกเลิกการจองแล้ว'}).waitFor();
+  await page.locator('[data-tab=revenue]').click();
+  assert(Number(await page.locator('#dailyDeparted').innerText())>=1);
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('[data-tab=map]').click();
+  await page.screenshot({path:path.join(tmp,'dashboard-reference-mobile.png'),fullPage:true});
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await page.setViewportSize({width:1440,height:1000});
   await page.goto('http://localhost:8080/platform.html');
   await page.locator('#workspace').waitFor({state:'visible'});
   await page.locator('[data-action=openSite]').first().click();
@@ -162,5 +194,5 @@ const server=spawn('java',['-cp',classes,'server.ParkingServer'],{cwd:tmp,env:{.
   assert(!(await onboarding.locator('#main').innerText()).includes('superadmin'));
   console.log('Browser PASS: shared dashboard session/ledger, parking, cash checkout, XLSX, custom road layout, all tabs, mobile, staff permissions');
   console.log('QA artifacts: '+tmp);
- } finally {if(browser)await browser.close();server.kill('SIGTERM');if(onboardingServer)onboardingServer.kill('SIGTERM');}
+ } finally {if(process.env.CI){fs.mkdirSync('browser-artifacts',{recursive:true});for(const name of fs.readdirSync(tmp).filter(n=>n.endsWith('.png')))fs.copyFileSync(path.join(tmp,name),path.join('browser-artifacts',name));}if(browser)await browser.close();server.kill('SIGTERM');if(onboardingServer)onboardingServer.kill('SIGTERM');}
 })().catch(e=>{console.error(e);process.exitCode=1;});
